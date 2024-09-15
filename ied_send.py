@@ -461,6 +461,7 @@ def main(argv):
     ied_name = argv[3]
 
     # Specify filename to parse
+    print(sed_filename)
     vector_of_ctrl_blks = parse_sed(sed_filename)
 
     # Find relevant Control Blocks pertaining to IED

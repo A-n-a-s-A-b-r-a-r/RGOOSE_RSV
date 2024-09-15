@@ -17,8 +17,11 @@ def parse_sed(filename):
 
     tree = ET.parse(filename)
     root = tree.getroot()
-
-    if root.tag != "SCL":
+    
+    namespace = ''
+    if '}' in root.tag:
+        namespace = root.tag.split('}', 1)[0] + '}'  # Namespace format: '{namespace}'
+    if root.tag != f'{namespace}SCL':
         print(f"Name of Root Node is not 'SCL'! Please check format of SED file: {filename}")
         exit(1)
     print(f"[*] Successfully parsed XML data in {filename}")
@@ -26,20 +29,20 @@ def parse_sed(filename):
 
     map_of_ld_with_cb = {}
 
-    for comm in root.findall(".//Communication"):
+    for comm in root.findall(f".//{namespace}Communication"):
         print(f"[*] Searching for Control Block(s) in <{comm.tag}> element...")
 
-        for subnet in comm.findall("SubNetwork"):
-            for ap in subnet.findall("ConnectedAP"):
+        for subnet in comm.findall(f"{namespace}SubNetwork"):
+            for ap in subnet.findall(f"{namespace}ConnectedAP"):
                 vector_of_LDs_with_CBs = []
 
                 for cb in ap:
                     CB_tmp = ControlBlock()
 
-                    if cb.tag in ["GSE", "SMV"]:
+                    if cb.tag in [f"{namespace}GSE", f"{namespace}SMV"]:
                         print(f"    {cb.tag} Control Block found in:")
                         print(f"    -> {subnet.tag}: {subnet.get('name')}")
-                        print(f"        -> {ap.tag}: {ap.get('iedName')}")
+                        print(f"        -> {ap.tag}: {ap.get(f'{namespace}iedName')}")
 
                         ld_inst = cb.get("ldInst")
                         if ld_inst:
@@ -51,7 +54,7 @@ def parse_sed(filename):
                         CB_tmp.hostIED = ap.get("iedName")
                         CB_tmp.cbType = cb.tag
 
-                        for address in cb.findall("Address/P"):
+                        for address in cb.findall(f"{namespace}Address/P"):
                             p_type = address.get("type")
                             if p_type == "IP":
                                 CB_tmp.multicastIP = address.text
@@ -65,33 +68,32 @@ def parse_sed(filename):
 
                 if vector_of_LDs_with_CBs:
                     map_of_ld_with_cb[ap.get("iedName")] = vector_of_LDs_with_CBs
-                    print(f"    Saved {len(vector_of_LDs_with_CBs)} LD(s) with CB(s) for IED {ap.get('iedName')} - to be checked later...\n")
+                    print(f"    Saved {len(vector_of_LDs_with_CBs)} LD(s) with CB(s) for IED {ap.get(f'{namespace}iedName')} - to be checked later...\n")
 
     print(f"[*] Found a total of {len(vector_of_ctrl_blks)} Control Block(s).\n")
-
     for ied_name, ld_list in map_of_ld_with_cb.items():
-        for ied in root.findall(".//IED"):
+        for ied in root.findall(f".//{namespace}IED"):
             if ied.get("name") == ied_name:
                 print(f"[*] Checking Control Block(s) in IED name = {ied.get('name')}...")
 
-                ap = ied.find("AccessPoint")
+                ap = ied.find(f"{namespace}AccessPoint")
 
-                for ldev in ap.findall("LDevice"):
+                for ldev in ap.findall(f"{namespace}LDevice"):
                     if ld_list and ldev.get("inst") == ld_list[-1]:
                         cbName = ""
                         datSetName = ""
                         datSetVector = []
 
-                        ln = ldev.find("LN0")
+                        ln = ldev.find(f"{namespace}LN0")
 
                         for cb in ln:
-                            if cb.tag in ["GSEControl", "SampledValueControl"]:
+                            if cb.tag in [f"{namespace}GSEControl", f"{namespace}SampledValueControl"]:
                                 cbName = cb.get("Name")
                                 datSetName = cb.get("datSet")
 
-                                for dataset in ln.findall("DataSet"):
+                                for dataset in ln.findall(f"{namespace}DataSet"):
                                     if dataset.get("name") == datSetName:
-                                        for fcda in dataset.findall("FCDA"):
+                                        for fcda in dataset.findall(f"{namespace}FCDA"):
                                             currentCyber = f"{ied.get('name')}.{fcda.get('lnClass')}.{fcda.get('doName')}.{fcda.get('daName')}"
                                             datSetVector.append(currentCyber)
 
@@ -109,7 +111,7 @@ def parse_sed(filename):
                                         ctrl_blk.datSetName = datSetName
                                         ctrl_blk.datSetVector = datSetVector
 
-                                        for subscribing in cb.findall("IEDName"):
+                                        for subscribing in cb.findall(f"{namespace}IEDName"):
                                             ctrl_blk.subscribingIEDs.append(subscribing.text)
 
                                         break
@@ -120,3 +122,5 @@ def parse_sed(filename):
 
     print("\n[*] Finished parsing SED file for Control Blocks.\n")
     return vector_of_ctrl_blks
+
+# print(parse_sed('RGOOSE_RSV_python\sample2.sed'))

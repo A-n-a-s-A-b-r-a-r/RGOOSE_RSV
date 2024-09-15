@@ -1,6 +1,6 @@
 # A collection of data structure and functions for IED operations/debugging
 import socket
-import fcntl
+# import fcntl
 import struct
 from typing import List
 # GOOSE/SV Data to be tracked per sending/receiving cycle
@@ -37,20 +37,23 @@ class IEEEfloat:
             self.exponent = 0
             self.sign = 0
 
-# IPv4 address on ifname is saved into ifreq structure
+
+import psutil
+import socket
 def getIPv4Add(ifname):
+    def list_network_interfaces():
+        net_if_addrs = psutil.net_if_addrs()
+        return list(net_if_addrs.keys())
+
+    print("Available interfaces:", list_network_interfaces())
     try:
-        fd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        ifreq = struct.pack('256s', ifname[:15].encode('utf-8'))
-        res = fcntl.ioctl(fd, 0x8915, ifreq)  # SIOCGIFADDR
-        ip = socket.inet_ntoa(res[20:24])
-    except OSError as e:
-        print(f"Error getting IP address: {e}")
-        ip = None
-    finally:
-        fd.close()
-    
-    return ip
+        net_if_addrs = psutil.net_if_addrs()
+        for addr in net_if_addrs[ifname]:
+            if addr.family == socket.AF_INET:
+                return addr.address
+    except KeyError as e:
+        print(f"Error: Interface {ifname} not found")
+        return None
 
 
 

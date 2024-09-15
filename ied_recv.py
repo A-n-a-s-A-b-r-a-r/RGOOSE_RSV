@@ -275,25 +275,8 @@ def valid_GSE_SMV(buf, numbytes, cbOut):
 IEDUDPPORT = 102
 MAXBUFLEN = 1024
 
-def getIPv4Add(ifname):
-    # Function to get IPv4 address based on interface name
-    # This will need to use platform-specific calls or a library
-    pass
-
-def parse_sed(filename):
-    # Function to parse the SED file
-    # Replace with actual parsing logic
-    return []
-
-def valid_GSE_SMV(data, length, cb):
-    # Function to validate GSE/SMV data
-    # Replace with actual validation logic
-    return True
-
-def convertToInt(data, start, end):
-    # Function to convert bits to integer
-    # Replace with actual conversion logic
-    return 0
+from ied_utils  import *
+from parse_sed import *
 
 def main():
     parser = argparse.ArgumentParser(description='Process SED filename and IED parameters.')
