@@ -8,6 +8,7 @@ import struct
 import sys
 
 MAXBUFLEN = 1024
+namespace = '{http://www.iec.ch/61850/2003/SCL}'
 
 class GooseSvData:
     def __init__(self, appID, cbName, datSetName):
@@ -42,7 +43,7 @@ def valid_GSE_SMV(buf, numbytes, cbOut):
             sess_prot = "GSE"
         # SI = 0xA2 for R-SV
         elif buf[2] == 0xA2:
-            sess_prot = "SMV"
+            sess_prot = f"{namespace}SMV"
         else:
             print("[!] Error: Session protocol not implemented", file=sys.stderr)
             return False
@@ -80,7 +81,7 @@ def valid_GSE_SMV(buf, numbytes, cbOut):
         print("[!] Error: Inconsistent Lengths detected", file=sys.stderr)
         return False
 
-    if not (buf[32] == 0x81 and sess_prot == "GSE") and not (buf[32] == 0x82 and sess_prot == "SMV"):
+    if not (buf[32] == 0x81 and sess_prot == "GSE") and not (buf[32] == 0x82 and sess_prot == f"{namespace}SMV"):
         print("[!] Error: Payload Type inconsistent with Session Identifier", file=sys.stderr)
         return False
 
@@ -232,7 +233,7 @@ def valid_GSE_SMV(buf, numbytes, cbOut):
         cbOut.prev_allData_Value = current_allData
         cbOut.prev_numDatSetEntries = current_numDatSetEntries
 
-    elif sess_prot == "SMV":
+    elif sess_prot == f"{namespace}SMV":
         if buf[38] != 0x61:
             print("[!] Error: SMV PDU Tag", file=sys.stderr)
             return False
@@ -272,7 +273,7 @@ def valid_GSE_SMV(buf, numbytes, cbOut):
 
 
 # Constants
-IEDUDPPORT = 102
+IEDUDPPORT = 3000
 MAXBUFLEN = 1024
 
 from ied_utils  import *
@@ -298,18 +299,17 @@ def main():
 
     cbSubscribe = []
     for cb in vector_of_ctrl_blks:
-        if ied_name in cb['subscribingIEDs']:
+        if ied_name in cb.subscribingIEDs:
             tmp_goose_sv_data = {
-                'cbName': cb['cbName'],
-                'cbType': cb['cbType'],
-                'appID': cb['appID'],
-                'multicastIP': cb['multicastIP']
-            }
+        'cbName': cb.cbName,  # Access attributes using dot notation
+        'cbType': cb.cbType,
+        'appID': cb.appID,
+        'multicastIP': cb.multicastIP
+    }
+    if cb.cbType == f'{namespace}GSE':
+        tmp_goose_sv_data['datSetName'] = cb.datSetName
 
-            if cb['cbType'] == 'GSE':
-                tmp_goose_sv_data['datSetName'] = cb['datSetName']
-
-            cbSubscribe.append(tmp_goose_sv_data)
+    cbSubscribe.append(tmp_goose_sv_data)
 
     if not cbSubscribe:
         print(f"{ied_name} has no Control Block(s) to subscribe to.")
@@ -329,9 +329,9 @@ def main():
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
     ownXCBRposition = 1
-
     while True:
         numbytes, buf, addr = sock.recvfrom(MAXBUFLEN)
+        print("ds")
         numbytes = len(buf)
         print(f">> {numbytes} bytes received from {addr[0]}")
 
@@ -356,7 +356,7 @@ def main():
                             ownXCBRposition = 1
                     else:
                         print("[!] GOOSE allData not recognised.")
-                elif cb['cbType'] == 'SMV':
+                elif cb['cbType'] == f'{namespace}SMV':
                     print(f"cbName: {cb['cbName']}")
                     print(f"smpCnt: {cb['prev_smpCnt_Value']}")
                     print(f"Checked R-SV OK\nsequenceofdata = {{  {' '.join(f'{item:02x}' for item in cb['prev_seqOfData_Value'])} }}")

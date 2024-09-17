@@ -456,6 +456,9 @@ def main(argv):
     
     # Save IPv4 address of specified Network Interface into ifr structure: ifr
     ifr = getIPv4Add(ifname)
+    print(type(ifr),"addraddress")
+    ifr = socket.inet_pton(socket.AF_INET,ifr)
+    
 
     # Specify IED name
     ied_name = argv[3]
@@ -468,10 +471,10 @@ def main(argv):
     ownControlBlocks = []
     goose_counter = 0
     sv_counter = 0
-
+    namespace = '{http://www.iec.ch/61850/2003/SCL}'
     for it in vector_of_ctrl_blks:
         if it.hostIED == ied_name:
-            if it.cbType == "GSE":
+            if it.cbType == f'{namespace}GSE':
                 goose_counter += 1
                 tmp_goose_data = GooseSvData()
                 
@@ -484,7 +487,7 @@ def main(argv):
                 
                 ownControlBlocks.append(tmp_goose_data)
             
-            elif it.cbType == "SMV":
+            elif it.cbType == f"{namespace}SMV":
                 sv_counter += 1
                 tmp_sv_data = GooseSvData()
                 
@@ -497,6 +500,9 @@ def main(argv):
                 ownControlBlocks.append(tmp_sv_data)
 
     # Keep looping to send multicast messages
+
+    print(ownControlBlocks[1].appID)    
+
     s_value = 0
     while True:
         time.sleep(1)  # in seconds
@@ -529,6 +535,7 @@ def main(argv):
             payload.append(0x00)  # Simulation 0x00: Boolean False = payload not sent for test
 
             # APP ID
+
             raw_converted_appid = int(ownControlBlocks[i].appID, 16)
             payload.append((raw_converted_appid >> 8) & 0xFF)
             payload.append(raw_converted_appid & 0xFF)
@@ -598,7 +605,7 @@ def main(argv):
 
             # Send via UDP multicast (ref: udpSock.hpp)
             sock = UdpSock()
-            diagnose(sock.isGood(), "Opening datagram socket for send")
+            diagnose(sock.is_good(), "Opening datagram socket for send")
 
             # Set multicast protocol network parameters
             groupSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -610,6 +617,7 @@ def main(argv):
 
             groupSock.sendto(bytearray(udp_data), (ownControlBlocks[i].multicastIP, IEDUDPPORT))
 
+            print(payload)
         s_value += 1
 
     return 0

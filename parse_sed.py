@@ -54,7 +54,7 @@ def parse_sed(filename):
                         CB_tmp.hostIED = ap.get("iedName")
                         CB_tmp.cbType = cb.tag
 
-                        for address in cb.findall(f"{namespace}Address/P"):
+                        for address in cb.findall(f"{namespace}Address/{namespace}P"):
                             p_type = address.get("type")
                             if p_type == "IP":
                                 CB_tmp.multicastIP = address.text
@@ -121,6 +121,7 @@ def parse_sed(filename):
                             break
 
     print("\n[*] Finished parsing SED file for Control Blocks.\n")
+    print(vector_of_ctrl_blks[1].appID,"asdf")
     return vector_of_ctrl_blks
 
 # print(parse_sed('RGOOSE_RSV_python\sample2.sed'))
