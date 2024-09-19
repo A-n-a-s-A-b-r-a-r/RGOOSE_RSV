@@ -622,13 +622,15 @@ def main(argv):
                 print("Error setting multicast TTL:", e)
 
             try:
+                udp_data = bytearray(udp_data)
                 # Make sure udp_data, ownControlBlocks, and IEDUDPPORT are properly defined
-                groupSock.sendto(bytearray(udp_data), (ownControlBlocks[i].multicastIP, IEDUDPPORT))
+                groupSock.sendto(udp_data, (ownControlBlocks[i].multicastIP, IEDUDPPORT))
+                print()
                 print("Data sent to:", ownControlBlocks[i].multicastIP, "on port", IEDUDPPORT)
             except Exception as e:
                 print("Error sending data:", e)
 
-            # print(udp_data)
+            print(bytearray(udp_data))
         s_value += 1
 
     return 0

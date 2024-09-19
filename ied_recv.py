@@ -1,13 +1,15 @@
-import argparse
 import socket
 import struct
 import sys
 import ipaddress
+from ied_utils  import *
+from parse_sed import *
 from zz_diagnose import *
 from udpSock import *
 import struct
 import sys
 
+IEDUDPPORT = 102
 MAXBUFLEN = 1024
 namespace = '{http://www.iec.ch/61850/2003/SCL}'
 
@@ -28,7 +30,7 @@ def valid_GSE_SMV(buf, numbytes, cbOut):
     if buf[0] == 0x01 and buf[1] == 0x40:
         # SI = 0xA1 for R-GOOSE
         if buf[2] == 0xA1:
-            sess_prot = "GSE"
+            sess_prot = f"{namespace}GSE"
         # SI = 0xA2 for R-SV
         elif buf[2] == 0xA2:
             sess_prot = f"{namespace}SMV"
@@ -69,7 +71,7 @@ def valid_GSE_SMV(buf, numbytes, cbOut):
         print("[!] Error: Inconsistent Lengths detected", file=sys.stderr)
         return False
 
-    if not (buf[32] == 0x81 and sess_prot == "GSE") and not (buf[32] == 0x82 and sess_prot == f"{namespace}SMV"):
+    if not (buf[32] == 0x81 and sess_prot == f"{namespace}GSE") and not (buf[32] == 0x82 and sess_prot == f"{namespace}SMV"):
         print("[!] Error: Payload Type inconsistent with Session Identifier", file=sys.stderr)
         return False
 
@@ -82,11 +84,13 @@ def valid_GSE_SMV(buf, numbytes, cbOut):
         return False
 
     current_appID = struct.unpack('>H', buf[34:36])[0]
+
     if current_appID != int(cbOut.appID, 16):
         print("[!] Error: Incorrect appID in Payload", file=sys.stderr)
+        print(current_appID, " != ",int(cbOut.appID, 16))
         return False
 
-    if sess_prot == "GSE":
+    if sess_prot == f"{namespace}GSE":
         if buf[38] != 0x61:
             print("[!] Error: GOOSE PDU Tag", file=sys.stderr)
             return False
@@ -112,6 +116,7 @@ def valid_GSE_SMV(buf, numbytes, cbOut):
 
         if buf[tag_idx] != 0x82:
             print("[!] Error: GOOSE datSet Tag", file=sys.stderr)
+            print(buf[tag_idx] , " != 0x82")
             return False
 
         current_datSet = buf[len_idx + 1: len_idx + 1 + buf[len_idx]].decode()
@@ -261,11 +266,6 @@ def valid_GSE_SMV(buf, numbytes, cbOut):
 
 
 # Constants
-IEDUDPPORT = 3000
-MAXBUFLEN = 1024
-
-from ied_utils  import *
-from parse_sed import *
 
 def main(argv):
     if len(argv) != 4:
@@ -349,8 +349,10 @@ def main(argv):
 
 
     ownXCBRposition = 1
+    print("ok")
     while True:
-        numbytes, buf, addr = sock.recvfrom(MAXBUFLEN)
+        print(sock.recvfrom(MAXBUFLEN))
+        buf, addr = sock.recvfrom(MAXBUFLEN)
         numbytes = len(buf)
         print(f">> {numbytes} bytes received from {addr[0]}")
 
