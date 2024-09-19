@@ -312,20 +312,41 @@ def main(argv):
         print(f"Please check configuration in {sed_filename}. Exiting program now...")
         return 1
 
-    sock = UdpSock()
-    diagnose(sock.is_good(), "Opening datagram socket for send")
+    # sock = UdpSock()
+    # diagnose(sock.is_good(), "Opening datagram socket for send")
     
-    # Create and configure socket
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    # # Create and configure socket
+    # sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    # sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    local_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-    local_sock.bind(('', IEDUDPPORT))
+    # local_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    # local_sock.bind(('', IEDUDPPORT))
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    diagnose(sock is not None, "Opening datagram socket for receive")
+    
+    # Enable SO_REUSEADDR to allow multiple instances of this application to receive copies of the multicast datagrams
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        diagnose(True, "Setting SO_REUSEADDR")
+    except Exception as e:
+        diagnose(False, f"Setting SO_REUSEADDR: {e}")
+    
+    # Bind to the proper port number with the IP address specified as INADDR_ANY
+    local_sock = ('', IEDUDPPORT)  # '' is equivalent to INADDR_ANY
+    try:
+        sock.bind(local_sock)
+        diagnose(True, "Binding datagram socket")
+    except Exception as e:
+        diagnose(False, f"Binding datagram socket: {e}")
+
+
 
     for cb in cbSubscribe:
         group = ipaddress.ip_address(cb.multicastIP)
         mreq = struct.pack('4sl', group.packed, socket.INADDR_ANY)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+
+
 
     ownXCBRposition = 1
     while True:
@@ -335,7 +356,7 @@ def main(argv):
 
         for cb in cbSubscribe:
             if valid_GSE_SMV(buf, numbytes, cb):
-                if cb.cbType == 'GSE':
+                if cb.cbType == f'{namespace}GSE':
                     print(f"Checked R-GOOSE OK\ncbName: {cb.cbName}")
                     print(f"\tallData = {{  {' '.join(f'{item:02x}' for item in cb.prev_allData_Value)} }}")
                     print(f"\tstNum = {cb.prev_stNum_Value} \tsqNum = {cb.prev_sqNum_Value} \t|"
