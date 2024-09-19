@@ -42,7 +42,7 @@ def parse_sed(filename):
                     if cb.tag in [f"{namespace}GSE", f"{namespace}SMV"]:
                         print(f"    {cb.tag} Control Block found in:")
                         print(f"    -> {subnet.tag}: {subnet.get('name')}")
-                        print(f"        -> {ap.tag}: {ap.get(f'{namespace}iedName')}")
+                        print(f"        -> {ap.tag}: {ap.get('iedName')}")
 
                         ld_inst = cb.get("ldInst")
                         if ld_inst:
@@ -68,7 +68,7 @@ def parse_sed(filename):
 
                 if vector_of_LDs_with_CBs:
                     map_of_ld_with_cb[ap.get("iedName")] = vector_of_LDs_with_CBs
-                    print(f"    Saved {len(vector_of_LDs_with_CBs)} LD(s) with CB(s) for IED {ap.get(f'{namespace}iedName')} - to be checked later...\n")
+                    print(f"    Saved {len(vector_of_LDs_with_CBs)} LD(s) with CB(s) for IED {ap.get('iedName')} - to be checked later...\n")
 
     print(f"[*] Found a total of {len(vector_of_ctrl_blks)} Control Block(s).\n")
     for ied_name, ld_list in map_of_ld_with_cb.items():
@@ -121,7 +121,6 @@ def parse_sed(filename):
                             break
 
     print("\n[*] Finished parsing SED file for Control Blocks.\n")
-    print(vector_of_ctrl_blks[1].appID,"asdf")
     return vector_of_ctrl_blks
 
 # print(parse_sed('RGOOSE_RSV_python\sample2.sed'))

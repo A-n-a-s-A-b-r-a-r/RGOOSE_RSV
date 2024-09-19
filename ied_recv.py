@@ -3,25 +3,13 @@ import socket
 import struct
 import sys
 import ipaddress
-
+from zz_diagnose import *
+from udpSock import *
 import struct
 import sys
 
 MAXBUFLEN = 1024
 namespace = '{http://www.iec.ch/61850/2003/SCL}'
-
-class GooseSvData:
-    def __init__(self, appID, cbName, datSetName):
-        self.appID = appID
-        self.cbName = cbName
-        self.datSetName = datSetName
-        self.prev_spduNum = 0
-        self.prev_stNum_Value = 0
-        self.prev_sqNum_Value = 0
-        self.prev_numDatSetEntries = 0
-        self.prev_allData_Value = []
-        self.prev_smpCnt_Value = 0
-        self.prev_seqOfData_Value = []
 
 def valid_GSE_SMV(buf, numbytes, cbOut):
     if numbytes > MAXBUFLEN or numbytes < 40:
@@ -279,43 +267,54 @@ MAXBUFLEN = 1024
 from ied_utils  import *
 from parse_sed import *
 
-def main():
-    parser = argparse.ArgumentParser(description='Process SED filename and IED parameters.')
-    parser.add_argument('sed_filename', type=str, help='SED Filename')
-    parser.add_argument('interface_name', type=str, help='Interface Name to be used on IED')
-    parser.add_argument('ied_name', type=str, help='IED Name')
+def main(argv):
+    if len(argv) != 4:
+        if argv[0]:
+            print(f"Usage: {argv[0]} <SED Filename> <Interface Name to be used on IED> <IED Name>")
+        else:
+            # For OS where argv[0] can end up as an empty string instead of the program's name.
+            print("Usage: <program name> <SED Filename> <Interface Name to be used on IED> <IED Name>")
+        return 1
 
-    args = parser.parse_args()
+    # Specify SED Filename
+    sed_filename = argv[1]
 
-    sed_filename = args.sed_filename
-    ifname = args.interface_name
-    ied_name = args.ied_name
+    # Specify Network Interface Name to be used on IED for inter-substation communication
+    ifname = argv[2]
+    
+    # Save IPv4 address of specified Network Interface into ifr structure: ifr
+    ifr = getIPv4Add(ifname)
+    ifr = socket.inet_pton(socket.AF_INET,ifr)
 
-    # Get the IPv4 address for the specified interface
-    getIPv4Add(ifname)
+    # Specify IED name
+    ied_name = argv[3]
 
-    # Parse the SED file
+    # Specify filename to parse
+    print(sed_filename)
     vector_of_ctrl_blks = parse_sed(sed_filename)
-
     cbSubscribe = []
     for cb in vector_of_ctrl_blks:
         if ied_name in cb.subscribingIEDs:
-            tmp_goose_sv_data = {
-        'cbName': cb.cbName,  # Access attributes using dot notation
-        'cbType': cb.cbType,
-        'appID': cb.appID,
-        'multicastIP': cb.multicastIP
-    }
-    if cb.cbType == f'{namespace}GSE':
-        tmp_goose_sv_data['datSetName'] = cb.datSetName
 
-    cbSubscribe.append(tmp_goose_sv_data)
+            tmp_goose_sv_data = GooseSvData() 
+            tmp_goose_sv_data.cbName = cb.cbName
+            tmp_goose_sv_data.cbType = cb.cbType
+            tmp_goose_sv_data.appID = cb.appID
+            tmp_goose_sv_data.multicastIP = cb.multicastIP
+            if cb.cbType == f'{namespace}GSE':
+                tmp_goose_sv_data.datSetName = cb.datSetName
 
+            cbSubscribe.append(tmp_goose_sv_data)
+
+    print(cbSubscribe)
     if not cbSubscribe:
         print(f"{ied_name} has no Control Block(s) to subscribe to.")
         print(f"Please check configuration in {sed_filename}. Exiting program now...")
         return 1
 
+    sock = UdpSock()
+    diagnose(sock.is_good(), "Opening datagram socket for send")
+    
     # Create and configure socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -324,46 +323,45 @@ def main():
     local_sock.bind(('', IEDUDPPORT))
 
     for cb in cbSubscribe:
-        group = ipaddress.ip_address(cb['multicastIP'])
+        group = ipaddress.ip_address(cb.multicastIP)
         mreq = struct.pack('4sl', group.packed, socket.INADDR_ANY)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
     ownXCBRposition = 1
     while True:
         numbytes, buf, addr = sock.recvfrom(MAXBUFLEN)
-        print("ds")
         numbytes = len(buf)
         print(f">> {numbytes} bytes received from {addr[0]}")
 
         for cb in cbSubscribe:
             if valid_GSE_SMV(buf, numbytes, cb):
-                if cb['cbType'] == 'GSE':
-                    print(f"Checked R-GOOSE OK\ncbName: {cb['cbName']}")
-                    print(f"\tallData = {{  {' '.join(f'{item:02x}' for item in cb['prev_allData_Value'])} }}")
-                    print(f"\tstNum = {cb['prev_stNum_Value']} \tsqNum = {cb['prev_sqNum_Value']} \t|"
-                          f"\tSPDU Number (from Session Header) = {cb['prev_spduNum']}")
+                if cb.cbType == 'GSE':
+                    print(f"Checked R-GOOSE OK\ncbName: {cb.cbName}")
+                    print(f"\tallData = {{  {' '.join(f'{item:02x}' for item in cb.prev_allData_Value)} }}")
+                    print(f"\tstNum = {cb.prev_stNum_Value} \tsqNum = {cb.prev_sqNum_Value} \t|"
+                          f"\tSPDU Number (from Session Header) = {cb.prev_spduNum}")
 
-                    if (cb['prev_allData_Value'][0] == 0x83 and cb['prev_allData_Value'][1] == 0x01):
-                        if cb['prev_allData_Value'][2] == 0:
+                    if (cb.prev_allData_Value[0] == 0x83 and cb.prev_allData_Value[1] == 0x01):
+                        if cb.prev_allData_Value[2] == 0:
                             print(f"[Simulation] Circuit-Breaker interlocking mechanism\n"
-                                  f"\t{cb['datSetName']} is Open.\n"
+                                  f"\t{cb.datSetName} is Open.\n"
                                   f"\tOpen {ied_name}$XCBR as well.")
                             ownXCBRposition = 0
                         elif ownXCBRposition == 0:
                             print(f"[Simulation] Circuit-Breaker interlocking mechanism\n"
-                                  f"\t{cb['datSetName']} is Close.\n"
+                                  f"\t{cb.datSetName} is Close.\n"
                                   f"\tClose {ied_name}$XCBR as well.")
                             ownXCBRposition = 1
                     else:
                         print("[!] GOOSE allData not recognised.")
-                elif cb['cbType'] == f'{namespace}SMV':
-                    print(f"cbName: {cb['cbName']}")
-                    print(f"smpCnt: {cb['prev_smpCnt_Value']}")
-                    print(f"Checked R-SV OK\nsequenceofdata = {{  {' '.join(f'{item:02x}' for item in cb['prev_seqOfData_Value'])} }}")
+                elif cb.cbType == f'{namespace}SMV':
+                    print(f"cbName: {cb.cbName}")
+                    print(f"smpCnt: {cb.prev_smpCnt_Value}")
+                    print(f"Checked R-SV OK\nsequenceofdata = {{  {' '.join(f'{item:02x}' for item in cb.prev_seqOfData_Value)} }}")
                     # Add logic to convert sequence of data to IEEE float
                     seqOfData = []
                     dataBytes = []
-                    for item in cb['prev_seqOfData_Value']:
+                    for item in cb.prev_seqOfData_Value:
                         x = item
                         dataBytes.extend([((x >> i) & 1) for i in range(7, -1, -1)])
                         if len(dataBytes) == 32:
@@ -377,4 +375,4 @@ def main():
                 break
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)

@@ -8,6 +8,7 @@ from zz_diagnose import *
 from parse_sed import *
 import time
 import math
+import os
 IEDUDPPORT = 102
 
 def set_timestamp(time_arr_out):
@@ -45,8 +46,6 @@ def set_timestamp(time_arr_out):
     # for i, val in enumerate(time_arr_out):
     #     print(f"time_arr_out[{i}]: {val:02x}")
 
-import os
-
 def set_gse_hardcoded_data(all_data_out, goose_data, loop_data):
     # Tag = 0x83 -> Data type: Boolean
     all_data_out.append(0x83)
@@ -55,7 +54,7 @@ def set_gse_hardcoded_data(all_data_out, goose_data, loop_data):
     all_data_out.append(0x01)
 
     # Read the GOOSE data from file
-    goose_counter = goose_data['goose_counter']
+    goose_counter = goose_data.goose_counter
     file_path = "GOOSEdata.txt"
     
     if not os.path.isfile(file_path):
@@ -76,12 +75,13 @@ def set_gse_hardcoded_data(all_data_out, goose_data, loop_data):
     
     # Determine the length of the cleaned line
     c = len(line)
+    print("Number of characters: ",c)
     
     # Determine the value of s_value
     if loop_data:
-        s_value = goose_data['s_value'] % c
+        s_value = goose_data.s_value % c
     else:
-        s_value = goose_data['s_value']
+        s_value = goose_data.s_value
     
     # Prevent overflow
     if s_value >= c:
@@ -100,15 +100,12 @@ def set_gse_hardcoded_data(all_data_out, goose_data, loop_data):
     if len(all_data_out) != 3:
         raise ValueError("all_data_out does not have exactly 3 bytes.")
 
-
-import struct
-
 def convert_ieee(float_value):
     """Convert a float to IEEE 754 binary format."""
     return struct.pack('>f', float_value)
 
 def set_sv_hardcoded_data(seq_of_data_value, sv_data, loop_data):
-    sv_counter = sv_data['sv_counter']
+    sv_counter = sv_data.sv_counter
     file_path = "SVdata.txt"
     
     if not os.path.isfile(file_path):
@@ -130,9 +127,9 @@ def set_sv_hardcoded_data(seq_of_data_value, sv_data, loop_data):
     
     # Calculate s_value
     if loop_data:
-        s_value = sv_data['s_value'] % (v // 16)
+        s_value = sv_data.s_value % (v // 16)
     else:
-        s_value = sv_data['s_value']
+        s_value = sv_data.s_value
     
     s_value *= 16
     
@@ -152,9 +149,6 @@ def set_sv_hardcoded_data(seq_of_data_value, sv_data, loop_data):
     if len(seq_of_data_value) != 64:
         raise ValueError("seq_of_data_value does not have exactly 64 bytes.")
 
-import struct
-import os
-
 def convert_uint32_to_bytes(value):
     """Convert a 32-bit unsigned integer to bytes."""
     return struct.pack('>I', value)
@@ -163,10 +157,10 @@ def convert_ieee(float_value):
     """Convert a float to IEEE 754 binary format."""
     return struct.pack('>f', float_value)
 
-def set_gse_hardcoded_data(goose_data, loop_data):
-    """Generate hardcoded GSE data for demonstration purposes."""
-    # This is a placeholder; implement this based on your actual needs
-    return [0x00, 0x01, 0x02]  # Example data
+# def set_gse_hardcoded_data(goose_data, loop_data):
+#     """Generate hardcoded GSE data for demonstration purposes."""
+#     # This is a placeholder; implement this based on your actual needs
+#     return [0x00, 0x01, 0x02]  # Example data
 
 def set_timestamp():
     """Generate a timestamp for demonstration purposes."""
@@ -180,7 +174,7 @@ def form_goose_pdu(goose_data, pdu_out):
 
     # *** GOOSE PDU -> gocbRef ***
     gocb_ref_tag = 0x80
-    gocb_ref_value = goose_data['cbName'].encode('utf-8')
+    gocb_ref_value = goose_data.cbName.encode('utf-8')
     gocb_ref_len = len(gocb_ref_value)
 
     # *** GOOSE PDU -> timeAllowedToLive (in ms) ***
@@ -190,12 +184,12 @@ def form_goose_pdu(goose_data, pdu_out):
 
     # *** GOOSE PDU -> datSet ***
     dat_set_tag = 0x82
-    dat_set_value = goose_data['datSetName'].encode('utf-8')
+    dat_set_value = goose_data.datSetName.encode('utf-8')
     dat_set_len = len(dat_set_value)
 
     # *** GOOSE PDU -> goID ***
     go_id_tag = 0x83
-    go_id_value = goose_data['cbName'].encode('utf-8')
+    go_id_value = goose_data.cbName.encode('utf-8')
     go_id_len = len(go_id_value)
 
     # *** GOOSE PDU -> t ***
@@ -235,22 +229,23 @@ def form_goose_pdu(goose_data, pdu_out):
 
     # *** GOOSE PDU -> allData ***
     all_data_tag = 0xAB
-    all_data_value = set_gse_hardcoded_data(goose_data, True)
+    all_data_value = []
+    set_gse_hardcoded_data(all_data_value, goose_data, True)
     all_data_len = len(all_data_value)
 
     # Determine stNum and sqNum based on state changes
-    state_changed = goose_data['prev_allData_Value'] != all_data_value
+    state_changed = goose_data.prev_allData_Value != all_data_value
     if state_changed:
-        st_num_value = goose_data['prev_stNum_Value'] + 1
+        st_num_value = goose_data.prev_stNum_Value + 1
         sq_num_value = 0
-        goose_data['prev_sqNum_Value'] = 0
+        goose_data.prev_sqNum_Value = 0
     else:
-        st_num_value = goose_data['prev_stNum_Value']
-        if goose_data['prev_sqNum_Value'] != 0xFFFFFFFF:
-            sq_num_value = goose_data['prev_sqNum_Value'] + 1
+        st_num_value = goose_data.prev_stNum_Value
+        if goose_data.prev_sqNum_Value != 0xFFFFFFFF:
+            sq_num_value = goose_data.prev_sqNum_Value + 1
         else:
             sq_num_value = 1
-        goose_data['prev_sqNum_Value'] = sq_num_value
+        goose_data.prev_sqNum_Value = sq_num_value
 
     # Determine timeAllowedToLive value
     if sq_num_value <= 5:
@@ -326,7 +321,7 @@ def form_goose_pdu(goose_data, pdu_out):
     pdu_out[1] = len(pdu_out)
 
     # Update historical allData
-    goose_data['prev_allData_Value'] = all_data_value
+    goose_data.prev_allData_Value = all_data_value
 
 def form_sv_pdu(sv_data, pdu_out):
     # Initialize variables for SV PDU data
@@ -346,8 +341,8 @@ def form_sv_pdu(sv_data, pdu_out):
 
     # SV ASDU -> MsvID
     sv_id_tag = 0x80
-    sv_id_len = len(sv_data['cbName'])
-    sv_id_value = sv_data['cbName'].encode('utf-8')
+    sv_id_len = len(sv_data.cbName)
+    sv_id_value = sv_data.cbName.encode('utf-8')
 
     # SV ASDU -> smpCnt
     smp_cnt_tag = 0x82
@@ -380,12 +375,12 @@ def form_sv_pdu(sv_data, pdu_out):
     time_value = bytearray([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a])
 
     # Set smpCnt Value (assume 50Hz)
-    if sv_data.get('prev_smpCnt_Value', 3999) != 3999:
-        smp_cnt_value = sv_data['prev_smpCnt_Value']
-        sv_data['prev_smpCnt_Value'] += 1
+    if sv_data.prev_smpCnt_Value != 3999:
+        smp_cnt_value = sv_data.prev_smpCnt_Value
+        sv_data.prev_smpCnt_Value += 1
     else:
         smp_cnt_value = 0
-        sv_data['prev_smpCnt_Value'] = 0
+        sv_data.prev_smpCnt_Value = 0
 
     # Set ASDU Length
     asdu_content = bytearray()
@@ -436,7 +431,7 @@ def form_sv_pdu(sv_data, pdu_out):
     pdu_out.extend(asdu_content)
 
     # Update historical allData before exiting function
-    sv_data['prev_seqOfData_Value'] = seq_of_data_value
+    sv_data.prev_seqOfData_Value = seq_of_data_value
 
 
 def main(argv):
@@ -456,9 +451,7 @@ def main(argv):
     
     # Save IPv4 address of specified Network Interface into ifr structure: ifr
     ifr = getIPv4Add(ifname)
-    print(type(ifr),"addraddress")
     ifr = socket.inet_pton(socket.AF_INET,ifr)
-    
 
     # Specify IED name
     ied_name = argv[3]
@@ -471,7 +464,9 @@ def main(argv):
     ownControlBlocks = []
     goose_counter = 0
     sv_counter = 0
+
     namespace = '{http://www.iec.ch/61850/2003/SCL}'
+
     for it in vector_of_ctrl_blks:
         if it.hostIED == ied_name:
             if it.cbType == f'{namespace}GSE':
@@ -484,7 +479,7 @@ def main(argv):
                 tmp_goose_data.multicastIP = it.multicastIP
                 tmp_goose_data.datSetName = it.datSetName
                 tmp_goose_data.goose_counter = goose_counter
-                
+
                 ownControlBlocks.append(tmp_goose_data)
             
             elif it.cbType == f"{namespace}SMV":
@@ -501,7 +496,7 @@ def main(argv):
 
     # Keep looping to send multicast messages
 
-    print(ownControlBlocks[1].appID)    
+    # print(ownControlBlocks)    
 
     s_value = 0
     while True:
@@ -515,7 +510,7 @@ def main(argv):
             # PDU will be part of Payload
             pdu = []
 
-            if ownControlBlocks[i].cbType == "GSE":
+            if ownControlBlocks[i].cbType == f"{namespace}GSE":
                 print("cbName", ownControlBlocks[i].cbName)
                 ownControlBlocks[i].s_value = s_value
                 form_goose_pdu(ownControlBlocks[i], pdu)
@@ -523,7 +518,7 @@ def main(argv):
                 # Payload Type 0x81: non-tunneled GOOSE APDU
                 payload.append(0x81)
 
-            elif ownControlBlocks[i].cbType == "SMV":
+            elif ownControlBlocks[i].cbType == f"{namespace}SMV":
                 print("cbName", ownControlBlocks[i].cbName)
                 ownControlBlocks[i].s_value = s_value
                 form_sv_pdu(ownControlBlocks[i], pdu)
@@ -554,9 +549,9 @@ def main(argv):
             udp_data.append(0x40)  # Transport Identifier (TI)
 
             # Based on IEC 61850-90-5 session protocol specification
-            if ownControlBlocks[i].cbType == "GSE":
+            if ownControlBlocks[i].cbType == f"{namespace}GSE":
                 udp_data.append(0xA1)  # 0xA1: non-tunneled GOOSE APDU
-            elif ownControlBlocks[i].cbType == "SMV":
+            elif ownControlBlocks[i].cbType == f"{namespace}SMV":
                 udp_data.append(0xA2)  # 0xA2: non-tunneled SV APDU
 
             udp_data.append(0x18)  # Length Identifier (LI)
@@ -611,13 +606,29 @@ def main(argv):
             groupSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             groupSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-            groupSock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, ifr)
+            try:
+                groupSock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, ifr)
+                print("Setting local Interface: ",ifname)
+            except Exception as e:
+                print("Error setting local interface:", e)
 
-            groupSock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, struct.pack('b', 16))
+            
+            try:
+                TTL = 16
+                groupSock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, struct.pack('b', TTL))
+                current_ttl = struct.unpack('b', groupSock.getsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1))[0]
+                print("TTL set to:", current_ttl)
+            except Exception as e:
+                print("Error setting multicast TTL:", e)
 
-            groupSock.sendto(bytearray(udp_data), (ownControlBlocks[i].multicastIP, IEDUDPPORT))
+            try:
+                # Make sure udp_data, ownControlBlocks, and IEDUDPPORT are properly defined
+                groupSock.sendto(bytearray(udp_data), (ownControlBlocks[i].multicastIP, IEDUDPPORT))
+                print("Data sent to:", ownControlBlocks[i].multicastIP, "on port", IEDUDPPORT)
+            except Exception as e:
+                print("Error sending data:", e)
 
-            print(payload)
+            # print(udp_data)
         s_value += 1
 
     return 0
