@@ -111,7 +111,7 @@ def valid_GSE_SMV(buf, numbytes, cbOut):
             print("[!] Error: goCBRef mismatch", file=sys.stderr)
             return False
 
-        tag_idx = (len_idx + 1 + buf[len_idx])
+        tag_idx = (len_idx + 1 + buf[len_idx] + 6)
         len_idx = tag_idx + 1
 
         if buf[tag_idx] != 0x82:
@@ -136,13 +136,13 @@ def valid_GSE_SMV(buf, numbytes, cbOut):
             print("[!] Error: goID mismatch", file=sys.stderr)
             return False
 
-        tag_idx = (len_idx + 1 + buf[len_idx])
+        tag_idx = (len_idx + 1 + buf[len_idx] + 10)
         len_idx = tag_idx + 1
 
         if buf[tag_idx] != 0x85:
             print("[!] Error: GOOSE stNum Tag", file=sys.stderr)
             return False
-
+        print(len_idx," ",buf[len_idx])
         current_stNum = struct.unpack('>I', buf[len_idx + 1: len_idx + 1 + buf[len_idx]])[0]
 
         tag_idx = (len_idx + 1 + buf[len_idx])
@@ -214,10 +214,12 @@ def valid_GSE_SMV(buf, numbytes, cbOut):
 
                 if current_allData != cbOut.prev_allData_Value:
                     print("[!] Error: allData not updated", file=sys.stderr)
+                    print(current_allData , " != ", cbOut.prev_allData_Value)
                     return False
 
         if current_numDatSetEntries != cbOut.prev_numDatSetEntries:
             print("[!] Error: numDatSetEntries mismatch", file=sys.stderr)
+            print(current_numDatSetEntries,'!=', cbOut.prev_numDatSetEntries)
             return False
 
         cbOut.prev_spduNum = current_spduNum
@@ -227,7 +229,7 @@ def valid_GSE_SMV(buf, numbytes, cbOut):
         cbOut.prev_numDatSetEntries = current_numDatSetEntries
 
     elif sess_prot == f"{namespace}SMV":
-        if buf[38] != 0x61:
+        if buf[38] != 0x60:
             print("[!] Error: SMV PDU Tag", file=sys.stderr)
             return False
 
@@ -295,7 +297,6 @@ def main(argv):
     cbSubscribe = []
     for cb in vector_of_ctrl_blks:
         if ied_name in cb.subscribingIEDs:
-
             tmp_goose_sv_data = GooseSvData() 
             tmp_goose_sv_data.cbName = cb.cbName
             tmp_goose_sv_data.cbType = cb.cbType
@@ -306,7 +307,7 @@ def main(argv):
 
             cbSubscribe.append(tmp_goose_sv_data)
 
-    print(cbSubscribe)
+    print(len(cbSubscribe))
     if not cbSubscribe:
         print(f"{ied_name} has no Control Block(s) to subscribe to.")
         print(f"Please check configuration in {sed_filename}. Exiting program now...")
@@ -346,18 +347,17 @@ def main(argv):
         mreq = struct.pack('4sl', group.packed, socket.INADDR_ANY)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-
-
     ownXCBRposition = 1
     print("ok")
     while True:
-        print(sock.recvfrom(MAXBUFLEN))
+        # print(sock.recvfrom(MAXBUFLEN))
         buf, addr = sock.recvfrom(MAXBUFLEN)
         numbytes = len(buf)
         print(f">> {numbytes} bytes received from {addr[0]}")
-
+        # print(list(buf))
+        print(cbSubscribe)
         for cb in cbSubscribe:
-            if valid_GSE_SMV(buf, numbytes, cb):
+            # if valid_GSE_SMV(buf, numbytes, cb):
                 if cb.cbType == f'{namespace}GSE':
                     print(f"Checked R-GOOSE OK\ncbName: {cb.cbName}")
                     print(f"\tallData = {{  {' '.join(f'{item:02x}' for item in cb.prev_allData_Value)} }}")

@@ -157,11 +157,6 @@ def convert_ieee(float_value):
     """Convert a float to IEEE 754 binary format."""
     return struct.pack('>f', float_value)
 
-# def set_gse_hardcoded_data(goose_data, loop_data):
-#     """Generate hardcoded GSE data for demonstration purposes."""
-#     # This is a placeholder; implement this based on your actual needs
-#     return [0x00, 0x01, 0x02]  # Example data
-
 def set_timestamp():
     """Generate a timestamp for demonstration purposes."""
     # This is a placeholder; implement this based on your actual needs
@@ -200,12 +195,12 @@ def form_goose_pdu(goose_data, pdu_out):
     # *** GOOSE PDU -> stNum ***
     st_num_tag = 0x85
     st_num_value = 0
-    st_num_len = 0
+    st_num_len = 4
 
     # *** GOOSE PDU -> sqNum ***
     sq_num_tag = 0x86
     sq_num_value = 0
-    sq_num_len = 0
+    sq_num_len = 4
 
     # *** GOOSE PDU -> test ***
     test_tag = 0x87
@@ -231,6 +226,8 @@ def form_goose_pdu(goose_data, pdu_out):
     all_data_tag = 0xAB
     all_data_value = []
     set_gse_hardcoded_data(all_data_value, goose_data, True)
+    # print("all data value")
+    # print(all_data_value)
     all_data_len = len(all_data_value)
 
     # Determine stNum and sqNum based on state changes
@@ -276,15 +273,17 @@ def form_goose_pdu(goose_data, pdu_out):
         time_allowed_to_live_value = 4000
         time_allowed_to_live_len = 2
 
+
     # Fill pdu_out with data
     pdu_out.append(goose_pdu_tag)
-    pdu_out.append(0)  # Placeholder for PDU length
+    pdu_out.append(goose_pdu_len)  # Placeholder for PDU length
 
     # Add components to PDU
     pdu_out.extend([gocb_ref_tag, gocb_ref_len])
     pdu_out.extend(gocb_ref_value)
 
     pdu_out.extend([time_allowed_to_live_tag, time_allowed_to_live_len])
+    # print("length of time allowed to live ",len(list(convert_uint32_to_bytes(time_allowed_to_live_value))))
     pdu_out.extend(convert_uint32_to_bytes(time_allowed_to_live_value))
 
     pdu_out.extend([dat_set_tag, dat_set_len])
@@ -297,6 +296,7 @@ def form_goose_pdu(goose_data, pdu_out):
     pdu_out.extend(time_value)
 
     pdu_out.extend([st_num_tag, st_num_len])
+    # print("sdfghj",len(list(convert_uint32_to_bytes(time_allowed_to_live_value))))
     pdu_out.extend(convert_uint32_to_bytes(st_num_value))
 
     pdu_out.extend([sq_num_tag, sq_num_len])
@@ -384,6 +384,9 @@ def form_sv_pdu(sv_data, pdu_out):
 
     # Set ASDU Length
     asdu_content = bytearray()
+    asdu_content.append(asdu_tag)
+    asdu_content.append(asdu_len)
+
     asdu_content.append(sv_id_tag)
     asdu_content.append(sv_id_len)
     asdu_content.extend(sv_id_value)
@@ -425,9 +428,9 @@ def form_sv_pdu(sv_data, pdu_out):
     pdu_out.append(no_asdu_tag)
     pdu_out.append(no_asdu_len)
     pdu_out.append(no_asdu_value)
-
     pdu_out.append(seq_of_asdu_tag)
     pdu_out.append(seq_of_asdu_len)
+
     pdu_out.extend(asdu_content)
 
     # Update historical allData before exiting function
@@ -457,7 +460,6 @@ def main(argv):
     ied_name = argv[3]
 
     # Specify filename to parse
-    print(sed_filename)
     vector_of_ctrl_blks = parse_sed(sed_filename)
 
     # Find relevant Control Blocks pertaining to IED
@@ -514,15 +516,16 @@ def main(argv):
                 print("cbName", ownControlBlocks[i].cbName)
                 ownControlBlocks[i].s_value = s_value
                 form_goose_pdu(ownControlBlocks[i], pdu)
-
                 # Payload Type 0x81: non-tunneled GOOSE APDU
                 payload.append(0x81)
 
             elif ownControlBlocks[i].cbType == f"{namespace}SMV":
+                # continue
                 print("cbName", ownControlBlocks[i].cbName)
                 ownControlBlocks[i].s_value = s_value
                 form_sv_pdu(ownControlBlocks[i], pdu)
 
+                print("pdu: ",bytearray(pdu))
                 # Payload Type 0x82: non-tunneled SV APDU
                 payload.append(0x82)
 
@@ -541,6 +544,7 @@ def main(argv):
             payload.append(apdu_len & 0xFF)
 
             # PDU
+            # print("PDU: ",pdu)
             payload.extend(pdu)
 
             # Based on RFC-1240 protocol (OSI connectionless transport services on top of UDP)
@@ -622,17 +626,18 @@ def main(argv):
                 print("Error setting multicast TTL:", e)
 
             try:
-                udp_data = bytearray(udp_data)
+                # udp_data = bytearray(udp_data)
                 # Make sure udp_data, ownControlBlocks, and IEDUDPPORT are properly defined
-                groupSock.sendto(udp_data, (ownControlBlocks[i].multicastIP, IEDUDPPORT))
-                print()
-                print("Data sent to:", ownControlBlocks[i].multicastIP, "on port", IEDUDPPORT)
+                groupSock.sendto(bytearray(udp_data), (ownControlBlocks[i].multicastIP, IEDUDPPORT))
+                print(len(udp_data),"bytes Data sent to:", ownControlBlocks[i].multicastIP, "on port", IEDUDPPORT)
             except Exception as e:
                 print("Error sending data:", e)
 
-            print(bytearray(udp_data))
+            print(udp_data)
+            print('-------------------------------------------------------------------------------')
         s_value += 1
-
+        print("Resend")
+        print()
     return 0
 if __name__ == "__main__":
     main(sys.argv)
