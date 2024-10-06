@@ -1,7 +1,6 @@
 # A collection of data structure and functions for IED operations/debugging
 import socket
 # import fcntl
-import struct
 from typing import List
 # GOOSE/SV Data to be tracked per sending/receiving cycle
 class GooseSvData:
@@ -25,6 +24,31 @@ class GooseSvData:
         self.prev_smpCnt_Value = 0
         self.prev_seqOfData_Value = []
         self.sv_counter = 0
+
+    def __str__(self):
+        return (
+            f"GooseSvData(cbName={self.cbName}, cbType={self.cbType}, appID={self.appID}, \n"
+            f"multicastIP={self.multicastIP}, prev_spduNum={self.prev_spduNum}, s_value={self.s_value}, \n"
+            f"datSetName={self.datSetName}, goose_counter={self.goose_counter}, \n"
+            f"prev_stNum_Value={self.prev_stNum_Value}, prev_sqNum_Value={self.prev_sqNum_Value}, \n"
+            f"prev_numDatSetEntries={self.prev_numDatSetEntries}, prev_allData_Value={self.prev_allData_Value}, \n"
+            f"prev_smpCnt_Value={self.prev_smpCnt_Value}, prev_seqOfData_Value={self.prev_seqOfData_Value}, \n"
+            f"sv_counter={self.sv_counter}) \n"
+            "\n"
+        )
+    def __repr__(self):
+        return (
+            f"GooseSvData(cbName={self.cbName}, cbType={self.cbType}, appID={self.appID}, \n"
+            f"multicastIP={self.multicastIP}, prev_spduNum={self.prev_spduNum}, s_value={self.s_value}, \n"
+            f"datSetName={self.datSetName}, goose_counter={self.goose_counter}, \n"
+            f"prev_stNum_Value={self.prev_stNum_Value}, prev_sqNum_Value={self.prev_sqNum_Value}, \n"
+            f"prev_numDatSetEntries={self.prev_numDatSetEntries}, prev_allData_Value={self.prev_allData_Value}, \n"
+            f"prev_smpCnt_Value={self.prev_smpCnt_Value}, prev_seqOfData_Value={self.prev_seqOfData_Value}, \n"
+            f"sv_counter={self.sv_counter}) \n"
+            "\n"
+        )
+        
+
 
 
 class IEEEfloat:
