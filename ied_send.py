@@ -11,6 +11,26 @@ import math
 import os
 IEDUDPPORT = 102
 
+import zlib
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+HEADER_LENGTH = 18  # Length of the PDU header (example)
+NONCE_SIZE = 12  # Nonce size for AES-GCM in bytes
+TAG_SIZE = 16  # Tag size for AES-GCM in bytes
+AES_KEY_SIZE = 32  # AES-256 key size in bytes
+def compress_data(data: bytes) -> bytes:
+    return zlib.compress(data)
+
+def decompress_data(data: bytes) -> bytes:
+    return zlib.decompress(data)
+
+def encrypt_aes_gcm(plaintext: bytes, key: bytes) -> bytes:
+    compressed_plaintext = compress_data(plaintext)
+    nonce = os.urandom(NONCE_SIZE)
+    cipher = Cipher(algorithms.AES(key), modes.GCM(nonce))
+    encryptor = cipher.encryptor()
+    ciphertext = encryptor.update(compressed_plaintext) + encryptor.finalize()
+    return nonce + ciphertext + encryptor.tag
+
 def set_timestamp(time_arr_out):
     # Get nanoseconds and seconds since epoch
     nanosec_since_epoch = int(time.time() * 1_000_000_000)
@@ -593,7 +613,11 @@ def main(argv):
             udp_data.append((payload_len >> 16) & 0xFF)
             udp_data.append((payload_len >> 8) & 0xFF)
             udp_data.append(payload_len & 0xFF)
-
+            
+            
+            key = os.urandom(AES_KEY_SIZE)
+            encrypted_payload = encrypt_aes_gcm(payload, key)
+            print("Encrypted GOOSE PDU:", encrypted_payload)
             udp_data.extend(payload)
 
             # Signature Tag = 0x85
