@@ -13,9 +13,7 @@ IEDUDPPORT = 102
 
 import zlib
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-HEADER_LENGTH = 18  # Length of the PDU header (example)
 NONCE_SIZE = 12  # Nonce size for AES-GCM in bytes
-TAG_SIZE = 16  # Tag size for AES-GCM in bytes
 AES_KEY_SIZE = 32  # AES-256 key size in bytes
 def compress_data(data: bytes) -> bytes:
     return zlib.compress(data)
@@ -519,7 +517,7 @@ def main(argv):
     # Keep looping to send multicast messages
 
     # print(ownControlBlocks)    
-
+    s = set()
     s_value = 0
     while True:
         time.sleep(1)  # in seconds
@@ -615,17 +613,26 @@ def main(argv):
             udp_data.append(payload_len & 0xFF)
             
             
-            key = os.urandom(AES_KEY_SIZE)
-            encrypted_payload = encrypt_aes_gcm(payload, key)
-            print("Encrypted GOOSE PDU:", encrypted_payload)
-            udp_data.extend(payload)
+            if(False):
+                key = os.urandom(AES_KEY_SIZE)
+                encrypted_payload = encrypt_aes_gcm(bytes(payload), key)
+                if(ownControlBlocks[i].cbType == f"{namespace}GSE"):
+                    print("Encrypted GOOSE PDU:", encrypted_payload)
+                else:
+                    print("Encrypted SV PDU:", encrypted_payload)
+                udp_data.extend(encrypted_payload)
+            else:
+                udp_data.extend(payload)
 
-            # Signature Tag = 0x85
+            # Signature Tag = 0x85                
             udp_data.append(0x85)
 
             # Length of HMAC considered as zero in this implementation
             udp_data.append(0x00)  # Application Profile = UDP Data completely formed here
-
+            # st = ''.join(map(str,udp_data))
+            # if st in s:
+            #     print("HAWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW")
+            # s.add(st)
             # Send via UDP multicast (ref: udpSock.hpp)
             sock = UdpSock()
             diagnose(sock.is_good(), "Opening datagram socket for send")
