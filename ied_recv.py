@@ -355,7 +355,7 @@ def main(argv):
         numbytes = len(buf)
         print(f">> {numbytes} bytes received from {addr[0]}")
         # print(list(buf))
-        print(cbSubscribe)
+        # print(cbSubscribe)
         for cb in cbSubscribe:
             # if valid_GSE_SMV(buf, numbytes, cb):
                 if cb.cbType == f'{namespace}GSE':
@@ -395,6 +395,7 @@ def main(argv):
                             seqOfData.append(float_value)
                             dataBytes = []
                     print(' '.join(f"{data:.8f}" for data in seqOfData))
+                
                 break
 
 if __name__ == "__main__":

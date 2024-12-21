@@ -49,8 +49,6 @@ class GooseSvData:
         )
         
 
-
-
 class IEEEfloat:
     def __init__(self):
         self.raw = self.Raw()
