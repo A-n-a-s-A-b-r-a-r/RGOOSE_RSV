@@ -15,6 +15,8 @@ import zlib
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 NONCE_SIZE = 12  # Nonce size for AES-GCM in bytes
 AES_KEY_SIZE = 32  # AES-256 key size in bytes
+
+
 def compress_data(data: bytes) -> bytes:
     return zlib.compress(data)
 
@@ -29,40 +31,50 @@ def encrypt_aes_gcm(plaintext: bytes, key: bytes) -> bytes:
     ciphertext = encryptor.update(compressed_plaintext) + encryptor.finalize()
     return nonce + ciphertext + encryptor.tag
 
-def set_timestamp(time_arr_out):
-    # Get nanoseconds and seconds since epoch
-    nanosec_since_epoch = int(time.time() * 1_000_000_000)
-    sec_since_epoch = int(time.time())
 
-    subsec_component = nanosec_since_epoch - (sec_since_epoch * 1_000_000_000)
-    frac_sec = float(subsec_component)
 
-    # Convert from [nanosecond] to [second]
-    for _ in range(9):
-        frac_sec /= 10
+import time
+def set_timestamp():
+    """Generate a timestamp for demonstration purposes."""
+    utc_timestamp = int(time.time())  # Get current UTC timestamp as an integer
+    return struct.pack('>Q', utc_timestamp)  # Pack it into 8 bytes (big-endian)
 
-    # Convert to 3-byte (24-bit) fraction of second value (ref: ISO 9506-2)
-    for _ in range(24):
-        frac_sec *= 2
+# def set_timestamp(time_arr_out):
+#     # Get nanoseconds and seconds since epoch
+#     nanosec_since_epoch = int(time.time() * 1_000_000_000)
+#     sec_since_epoch = int(time.time())
 
-    frac_sec = round(frac_sec)
-    subsec_component = int(frac_sec)
+#     subsec_component = nanosec_since_epoch - (sec_since_epoch * 1_000_000_000)
+#     frac_sec = float(subsec_component)
 
-    # Set integer seconds in array's high order octets (0 to 3)
-    for i in range(len(time_arr_out) // 2):
-        time_arr_out[i] = (sec_since_epoch >> (24 - 8 * i)) & 0xff
+#     # Convert from [nanosecond] to [second]
+#     for _ in range(9):
+#         frac_sec /= 10
 
-    # Set fractional second in array's octets 4 to 6
-    for i in range(len(time_arr_out) // 2, len(time_arr_out) - 1):
-        time_arr_out[i] = (subsec_component >> (16 - 8 * (i - len(time_arr_out) // 2))) & 0xff
+#     # Convert to 3-byte (24-bit) fraction of second value (ref: ISO 9506-2)
+#     for _ in range(24):
+#         frac_sec *= 2
 
-    # Debugging: Print values for inspection (if needed)
-    # print(f"seconds since epoch: {sec_since_epoch}")
-    # print(f"nanoseconds since epoch: {nanosec_since_epoch}")
-    # print(f"round(frac_sec * 2^24): {frac_sec}")
-    # print(f"frac_sec (integer): {subsec_component}")
-    # for i, val in enumerate(time_arr_out):
-    #     print(f"time_arr_out[{i}]: {val:02x}")
+#     frac_sec = round(frac_sec)
+#     subsec_component = int(frac_sec)
+
+#     # Set integer seconds in array's high order octets (0 to 3)
+#     for i in range(len(time_arr_out) // 2):
+#         time_arr_out[i] = (sec_since_epoch >> (24 - 8 * i)) & 0xff
+
+#     # Set fractional second in array's octets 4 to 6
+#     for i in range(len(time_arr_out) // 2, len(time_arr_out) - 1):
+#         time_arr_out[i] = (subsec_component >> (16 - 8 * (i - len(time_arr_out) // 2))) & 0xff
+
+#     # Debugging: Print values for inspection (if needed)
+#     # print(f"seconds since epoch: {sec_since_epoch}")
+#     # print(f"nanoseconds since epoch: {nanosec_since_epoch}")
+#     # print(f"round(frac_sec * 2^24): {frac_sec}")
+#     # print(f"frac_sec (integer): {subsec_component}")
+#     # for i, val in enumerate(time_arr_out):
+#     #     print(f"time_arr_out[{i}]: {val:02x}")
+
+
 
 def set_gse_hardcoded_data(all_data_out, goose_data, loop_data):
     # Tag = 0x83 -> Data type: Boolean
@@ -118,9 +130,6 @@ def set_gse_hardcoded_data(all_data_out, goose_data, loop_data):
     if len(all_data_out) != 3:
         raise ValueError("all_data_out does not have exactly 3 bytes.")
 
-def convert_ieee(float_value):
-    """Convert a float to IEEE 754 binary format."""
-    return struct.pack('>f', float_value)
 
 def set_sv_hardcoded_data(seq_of_data_value, sv_data, loop_data):
     sv_counter = sv_data.sv_counter
@@ -160,6 +169,7 @@ def set_sv_hardcoded_data(seq_of_data_value, sv_data, loop_data):
     # Convert values to IEEE 754 format and append to seq_of_data_value
     for value in value_list:
         float_value = float(value)
+        
         ieee_bytes = convert_ieee(float_value)
         seq_of_data_value.extend(ieee_bytes)
     
@@ -167,18 +177,17 @@ def set_sv_hardcoded_data(seq_of_data_value, sv_data, loop_data):
     if len(seq_of_data_value) != 64:
         raise ValueError("seq_of_data_value does not have exactly 64 bytes.")
 
+
+''' duplicate'''
 def convert_uint32_to_bytes(value):
     """Convert a 32-bit unsigned integer to bytes."""
     return struct.pack('>I', value)
 
+''' duplicate'''
 def convert_ieee(float_value):
     """Convert a float to IEEE 754 binary format."""
     return struct.pack('>f', float_value)
 
-def set_timestamp():
-    """Generate a timestamp for demonstration purposes."""
-    # This is a placeholder; implement this based on your actual needs
-    return [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a]  # Example timestamp
 
 def form_goose_pdu(goose_data, pdu_out):
     # Initialize variables for GOOSE PDU data
@@ -302,7 +311,9 @@ def form_goose_pdu(goose_data, pdu_out):
 
     pdu_out.extend([time_allowed_to_live_tag, time_allowed_to_live_len])
     # print("length of time allowed to live ",len(list(convert_uint32_to_bytes(time_allowed_to_live_value))))
-    pdu_out.extend(convert_uint32_to_bytes(time_allowed_to_live_value))
+    from ied_utils import convertUINT32IntoBytes
+    # pdu_out.extend(convert_uint32_to_bytes(time_allowed_to_live_value))
+    pdu_out.extend(convertUINT32IntoBytes(time_allowed_to_live_value))
 
     pdu_out.extend([dat_set_tag, dat_set_len])
     pdu_out.extend(dat_set_value)
@@ -315,10 +326,15 @@ def form_goose_pdu(goose_data, pdu_out):
 
     pdu_out.extend([st_num_tag, st_num_len])
     # print("sdfghj",len(list(convert_uint32_to_bytes(time_allowed_to_live_value))))
-    pdu_out.extend(convert_uint32_to_bytes(st_num_value))
+    
+    # pdu_out.extend(convert_uint32_to_bytes(st_num_value))
+    pdu_out.extend(convertUINT32IntoBytes(st_num_value))
 
     pdu_out.extend([sq_num_tag, sq_num_len])
-    pdu_out.extend(convert_uint32_to_bytes(sq_num_value))
+    
+    
+    pdu_out.extend(convertUINT32IntoBytes(sq_num_value))
+    # pdu_out.extend(convert_uint32_to_bytes(sq_num_value))
 
     pdu_out.extend([test_tag, test_len])
     pdu_out.append(test_value)
@@ -390,7 +406,7 @@ def form_sv_pdu(sv_data, pdu_out):
     # SV ASDU -> t
     time_tag = 0x89
     time_len = 0x08
-    time_value = bytearray([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a])
+    time_value = set_timestamp()
 
     # Set smpCnt Value (assume 50Hz)
     if sv_data.prev_smpCnt_Value != 3999:

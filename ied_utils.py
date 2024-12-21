@@ -99,11 +99,12 @@ class ControlBlock:
         self.cbType = cbType
         self.multicastIP = multicastIP
         self.appID = appID
-        self.vlanID = vlanID
         self.cbName = cbName
         self.datSetName = datSetName
-        self.datSetVector = datSetVector
         self.subscribingIEDs = subscribingIEDs
+        
+        self.datSetVector = datSetVector
+        self.vlanID = vlanID
 
 
 # Function to print values of variables in a given Control Block
