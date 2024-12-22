@@ -1,1 +1,1 @@
-python3 ied_recv.py sample.sed eth0 S2_IED0
+python3 new_recv.py sample.sed eth0 S1_IED22

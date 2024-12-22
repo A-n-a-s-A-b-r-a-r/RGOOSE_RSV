@@ -37,7 +37,7 @@
 				</Address>
 				<SMV cbName="L2Diff22-R-SV" desc="R-SV from S1_IED22" ldInst="LD1">
 					<Address>
-						<P type="IP">238.0.0.2</P>
+						<P type="IP">238.0.1.1</P>
 						<P type="APPID">0001</P>
 						<P type="VLAN-ID">0</P>
 						<P type="VLAN-PRIORITY">4</P>

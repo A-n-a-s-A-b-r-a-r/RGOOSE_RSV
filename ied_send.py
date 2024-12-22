@@ -9,6 +9,12 @@ from parse_sed import *
 import time
 import os
 
+HEADER_LENGTH = 18  # Length of the PDU header (example)
+NONCE_SIZE = 12  # Nonce size for AES-GCM in bytes
+TAG_SIZE = 16  # Tag size for AES-GCM in bytes
+AES_KEY_SIZE = 32  # AES-256 key size in bytes
+
+
 IEDUDPPORT = 102
 from form_pdu import form_goose_pdu, form_sv_pdu
 from compression_encryption import compress_data, decompress_data, encrypt_aes_gcm;
@@ -208,9 +214,8 @@ def main(argv):
             udp_data.append(payload_len & 0xFF)
             
             
-            if(False):
-                key = os.urandom(AES_KEY_SIZE)
-                encrypted_payload = encrypt_aes_gcm(bytes(payload), key)
+            if(True):
+                encrypted_payload = encrypt_aes_gcm(bytes(payload))
                 if(ownControlBlocks[i].cbType == f"{namespace}GSE"):
                     print("Encrypted GOOSE PDU:", encrypted_payload)
                 else:

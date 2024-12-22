@@ -341,7 +341,6 @@ def main(argv):
         diagnose(False, f"Binding datagram socket: {e}")
 
 
-
     for cb in cbSubscribe:
         group = ipaddress.ip_address(cb.multicastIP)
         mreq = struct.pack('4sl', group.packed, socket.INADDR_ANY)
@@ -357,7 +356,7 @@ def main(argv):
         # print(list(buf))
         # print(cbSubscribe)
         for cb in cbSubscribe:
-            # if valid_GSE_SMV(buf, numbytes, cb):
+            if valid_GSE_SMV(buf, numbytes, cb):
                 if cb.cbType == f'{namespace}GSE':
                     print(f"Checked R-GOOSE OK\ncbName: {cb.cbName}")
                     print(f"\tallData = {{  {' '.join(f'{item:02x}' for item in cb.prev_allData_Value)} }}")
