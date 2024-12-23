@@ -17,7 +17,7 @@ AES_KEY_SIZE = 32  # AES-256 key size in bytes
 
 IEDUDPPORT = 102
 from form_pdu import form_goose_pdu, form_sv_pdu
-from compression_encryption import compress_data, decompress_data, encrypt_aes_gcm;
+from compression_encryption import compress_data, decompress_data, encrypt_aes_gcm, decrypt_aes_gcm;
 
 
 # def set_timestamp(time_arr_out):
@@ -213,27 +213,20 @@ def main(argv):
             udp_data.append((payload_len >> 8) & 0xFF)
             udp_data.append(payload_len & 0xFF)
             
-            
-            if(True):
-                encrypted_payload = encrypt_aes_gcm(bytes(payload))
-                if(ownControlBlocks[i].cbType == f"{namespace}GSE"):
-                    print("Encrypted GOOSE PDU:", encrypted_payload)
-                else:
-                    print("Encrypted SV PDU:", encrypted_payload)
-                udp_data.extend(encrypted_payload)
-            else:
-                udp_data.extend(payload)
+            print(len(udp_data))
+            print("before encryption",len(payload))
+            if True:
+                payload = list(compress_data(bytes(payload)))
+                payload = list(encrypt_aes_gcm(bytes(payload)))
+            udp_data.extend(payload)
 
             # Signature Tag = 0x85                
             udp_data.append(0x85)
 
             # Length of HMAC considered as zero in this implementation
             udp_data.append(0x00)  # Application Profile = UDP Data completely formed here
-            # st = ''.join(map(str,udp_data))
-            # if st in s:
-            #     print("HAWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW")
-            # s.add(st)
-            # Send via UDP multicast (ref: udpSock.hpp)
+
+            
             sock = UdpSock()
             diagnose(sock.is_good(), "Opening datagram socket for send")
 

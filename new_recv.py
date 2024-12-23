@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import time
 import netifaces
 
-from compression_encryption import decrypt_aes_gcm
+from compression_encryption import decrypt_aes_gcm, decompress_data
 from ied_utils import getIPv4Add
 from parse_sed import parse_sed
 
@@ -329,10 +329,17 @@ def main():
         
         while True:
             data, addr = sock.recvfrom(65535)
-            print(type(data))
-            data = decrypt_aes_gcm(data)
+            
+            payload = data[32:-2]
+            headers = list(data[:32])
+            signature = list(data[-2:])
+
+            if True:
+                payload = list(decrypt_aes_gcm(bytes(payload)))
+                payload = list(decompress_data(bytes(payload)))
+
+            data = headers + payload + signature
             data = bytearray(data)
-            print(data)
 
             
             if len(data) < 4:  # Minimum required length
