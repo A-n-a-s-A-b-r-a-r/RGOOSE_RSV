@@ -1,3 +1,4 @@
+from datetime import datetime
 import socket
 import struct
 import sys
@@ -94,7 +95,7 @@ def decode_goose_pdu(data, offset):
     try:
         packet = ReceivedPacket(packet_type='GOOSE', 
                                appid=0, length=0, 
-                               timestamp=time.time(),
+                               timestamp= time.time(),
                                multicast_ip='')
         
         # Skip GOOSE PDU tag
@@ -127,6 +128,10 @@ def decode_goose_pdu(data, offset):
                 bytes_data = safe_get_bytes(data, offset, length)
                 if bytes_data:
                     packet.go_id = bytes_data.decode('utf-8', errors='ignore')
+            elif tag == 0x84:  # timestamp
+                bytes_data = safe_get_bytes(data, offset, length)
+                if bytes_data and len(bytes_data) == 8:  # Ensure we have 8 bytes for double
+                    packet.timestamp = struct.unpack('>d', bytes_data)[0]
             elif tag == 0x85:  # stNum
                 bytes_data = safe_get_bytes(data, offset, length)
                 if bytes_data:
@@ -231,7 +236,12 @@ def decode_sv_pdu(data, offset):
                                         value = struct.unpack('>f', bytes_data)[0]
                                         packet.sample_data.append(value)
                                     sample_offset += 4
-                                    
+                            elif inner_tag == 0x89:  # timestamp
+                                bytes_data = safe_get_bytes(data, inner_offset, inner_len)
+                                if bytes_data and len(bytes_data) == 8:
+                                    packet.timestamp = struct.unpack('>d', bytes_data)[0]
+
+                            
                             inner_offset += inner_len
                         
                         asdu_offset += asdu_len
@@ -245,20 +255,28 @@ def decode_sv_pdu(data, offset):
         print(f"Error decoding SV PDU: {e}")
         return None
 
+
+total_transmission_time_goose = 0.0
+total_packets_goose = -1
+total_transmission_time_sv = 0.0
+total_packets_sv = -1
 def display_packet_info(packet):
     """Display received packet information"""
     if not packet:
         return
-    import time, datetime
+    import time
     print("\n" + "="*80)
     print(f"Received {packet.packet_type} Packet from {packet.multicast_ip}")
-    print(f"Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(packet.timestamp))}")
+    
+    print(f"Packet Timestamp: {datetime.fromtimestamp(packet.timestamp)}")
 
-    from datetime import datetime
-    given_datetime = datetime.fromtimestamp(packet.timestamp)
-    current_datetime = datetime.now()
-    time_difference_ms = (current_datetime - given_datetime).total_seconds() * 1000
+    given_datetime = packet.timestamp
+    current_datetime = time.time()
+    print("Current Timestamp",datetime.fromtimestamp(current_datetime))
+    time_difference_ms = (current_datetime - given_datetime) * 1000
+
     print("Transmission time: ",round(time_difference_ms, 6), " ms")
+    
 
 
 
@@ -266,6 +284,13 @@ def display_packet_info(packet):
     print(f"Length: {packet.length} bytes")
     
     if packet.packet_type == 'GOOSE':
+        global total_transmission_time_goose, total_packets_goose
+        if total_packets_goose == -1:
+            total_packets_goose += 1
+        else:
+            total_packets_goose += 1
+            total_transmission_time_goose += time_difference_ms
+            print("Average Goose Trasmission time: ", total_transmission_time_goose/total_packets_goose)
         print("\nGOOSE Specific Information:")
         if packet.gocb_ref: print(f"GoCB Reference: {packet.gocb_ref}")
         if packet.time_allowed_to_live: print(f"Time Allowed to Live: {packet.time_allowed_to_live}ms")
@@ -280,6 +305,14 @@ def display_packet_info(packet):
         if packet.data_values: print(f"Data Values: {packet.data_values}")
     
     elif packet.packet_type == 'SV':
+        global total_transmission_time_sv, total_packets_sv
+        if total_packets_sv == -1:
+            total_packets_sv += 1
+        else:
+            total_packets_sv += 1
+            total_transmission_time_sv += time_difference_ms
+            print("Average SV Trasmission time: ", total_transmission_time_sv/total_packets_sv)
+
         print("\nSampled Values Specific Information:")
         if packet.svid: print(f"svID: {packet.svid}")
         if packet.smp_cnt is not None: print(f"Sample Count: {packet.smp_cnt}")
@@ -288,6 +321,7 @@ def display_packet_info(packet):
             print("\nSample Values:")
             for i, value in enumerate(packet.sample_data):
                 print(f"  Sample {i}: {value}")
+
 
 def main():
     if len(sys.argv) != 4:
@@ -334,11 +368,11 @@ def main():
             headers = list(data[:32])
             signature = list(data[-2:])
 
-            if True:
-                payload = list(decrypt_aes_gcm(bytes(payload)))
-                payload = list(decompress_data(bytes(payload)))
+            if  True:
+                payload = (decrypt_aes_gcm(bytes(payload)))
+                payload = (decompress_data(bytes(payload)))
 
-            data = headers + payload + signature
+            data = headers + list(payload) + signature
             data = bytearray(data)
 
             

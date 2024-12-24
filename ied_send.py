@@ -215,7 +215,7 @@ def main(argv):
             
             print(len(udp_data))
             print("before encryption",len(payload))
-            if True:
+            if  True:
                 payload = list(compress_data(bytes(payload)))
                 payload = list(encrypt_aes_gcm(bytes(payload)))
             udp_data.extend(payload)

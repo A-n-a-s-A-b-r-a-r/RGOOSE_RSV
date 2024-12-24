@@ -1,10 +1,12 @@
 import os,struct
 
 import time
+from datetime import datetime
 def set_timestamp():
     """Generate a timestamp for demonstration purposes."""
-    utc_timestamp = int(time.time())  # Get current UTC timestamp as an integer
-    return struct.pack('>Q', utc_timestamp)  # Pack it into 8 bytes (big-endian)
+    utc_timestamp = time.time()  # Get current UTC timestamp as an integer
+    print("Timestamp: ",datetime.fromtimestamp(utc_timestamp))
+    return struct.pack('>d', utc_timestamp)  # Pack it into 8 bytes (big-endian)
 
 ''' duplicate: not in use currently'''
 def convert_uint32_to_bytes(value):
