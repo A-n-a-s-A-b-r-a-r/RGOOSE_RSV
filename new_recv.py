@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import time
 import netifaces
 
-from compression_encryption import decrypt_aes_gcm, decompress_data
+from compression_encryption import decrypt_aes_gcm, decompress_data ,encrypt_aes_gcm
 from ied_utils import getIPv4Add
 from parse_sed import parse_sed
 
@@ -257,9 +257,9 @@ def decode_sv_pdu(data, offset):
 
 
 total_transmission_time_goose = 0.0
-total_packets_goose = -1
+total_packets_goose = 0
 total_transmission_time_sv = 0.0
-total_packets_sv = -1
+total_packets_sv = 0
 def display_packet_info(packet):
     """Display received packet information"""
     if not packet:
@@ -284,13 +284,11 @@ def display_packet_info(packet):
     print(f"Length: {packet.length} bytes")
     
     if packet.packet_type == 'GOOSE':
-        global total_transmission_time_goose, total_packets_goose
-        if total_packets_goose == -1:
-            total_packets_goose += 1
-        else:
-            total_packets_goose += 1
-            total_transmission_time_goose += time_difference_ms
-            print("Average Goose Trasmission time: ", total_transmission_time_goose/total_packets_goose)
+        global total_transmission_time_goose, total_packets_goose        
+        total_packets_goose += 1
+        total_transmission_time_goose += time_difference_ms
+        print("Average Goose Trasmission time: ", total_transmission_time_goose/total_packets_goose)
+
         print("\nGOOSE Specific Information:")
         if packet.gocb_ref: print(f"GoCB Reference: {packet.gocb_ref}")
         if packet.time_allowed_to_live: print(f"Time Allowed to Live: {packet.time_allowed_to_live}ms")
@@ -306,12 +304,9 @@ def display_packet_info(packet):
     
     elif packet.packet_type == 'SV':
         global total_transmission_time_sv, total_packets_sv
-        if total_packets_sv == -1:
-            total_packets_sv += 1
-        else:
-            total_packets_sv += 1
-            total_transmission_time_sv += time_difference_ms
-            print("Average SV Trasmission time: ", total_transmission_time_sv/total_packets_sv)
+        total_packets_sv += 1
+        total_transmission_time_sv += time_difference_ms
+        print("Average SV Trasmission time: ", total_transmission_time_sv/total_packets_sv)
 
         print("\nSampled Values Specific Information:")
         if packet.svid: print(f"svID: {packet.svid}")
@@ -356,6 +351,9 @@ def main():
 
     # Create UDP socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    demo_data = encrypt_aes_gcm(bytes([123]))
+    decrypt_aes_gcm(demo_data)
+
     
     try:
         join_multicast_group(sock, multicast_ip, interface_name)
@@ -368,9 +366,14 @@ def main():
             headers = list(data[:32])
             signature = list(data[-2:])
 
+            start_time = time.time()*1000
             if  True:
                 payload = (decrypt_aes_gcm(bytes(payload)))
-                payload = (decompress_data(bytes(payload)))
+                # payload = (decompress_data(bytes(payload)))
+                end_time = time.time()*1000
+                delay = (end_time - start_time)
+                print("--------------------------------------------------------------------------------\n\nTime taken by decryption/decompression: ", round(delay,3), "ms")
+
 
             data = headers + list(payload) + signature
             data = bytearray(data)

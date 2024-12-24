@@ -115,9 +115,12 @@ def main(argv):
 
                 ownControlBlocks.append(tmp_sv_data)
 
-    # Keep looping to send multicast messages
 
-    # print(ownControlBlocks)    
+    demo_data = encrypt_aes_gcm(bytes([123]))
+    decrypt_aes_gcm(demo_data)
+
+
+    # Keep looping to send multicast messages
     s = set()
     s_value = 0
     while True:
@@ -214,10 +217,15 @@ def main(argv):
             udp_data.append(payload_len & 0xFF)
             
             print(len(udp_data))
-            print("before encryption",len(payload))
+            print("Payload length before encryption/compression",len(payload))
+
+            start_time = time.time()*1000
             if  True:
-                payload = list(compress_data(bytes(payload)))
+                # payload = list(compress_data(bytes(payload)))
                 payload = list(encrypt_aes_gcm(bytes(payload)))
+                end_time = time.time()*1000
+                delay = (end_time - start_time)
+                print("Time taken by encryption/compression: ", round(delay, 3), "ms")
             udp_data.extend(payload)
 
             # Signature Tag = 0x85                
