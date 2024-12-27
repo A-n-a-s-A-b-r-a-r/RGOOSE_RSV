@@ -260,6 +260,9 @@ total_transmission_time_goose = 0.0
 total_packets_goose = 0
 total_transmission_time_sv = 0.0
 total_packets_sv = 0
+total_decrypt_time = 0.0
+total_packets= 0
+
 def display_packet_info(packet):
     """Display received packet information"""
     if not packet:
@@ -371,8 +374,11 @@ def main():
                 payload = (decrypt_aes_gcm(bytes(payload)))
                 # payload = (decompress_data(bytes(payload)))
                 end_time = time.time()*1000
-                delay = (end_time - start_time)
-                print("--------------------------------------------------------------------------------\n\nTime taken by decryption/decompression: ", round(delay,3), "ms")
+                global total_decrypt_time, total_packets
+                total_decrypt_time += (end_time - start_time)
+                total_packets += 1
+            
+                print("--------------------------------------------------------------------------------\n\nAverage Time taken by decryption/decompression: ", round((total_decrypt_time/total_packets),3), "ms")
 
 
             data = headers + list(payload) + signature

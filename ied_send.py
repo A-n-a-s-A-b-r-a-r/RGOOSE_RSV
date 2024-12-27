@@ -19,7 +19,8 @@ IEDUDPPORT = 102
 from form_pdu import form_goose_pdu, form_sv_pdu
 from compression_encryption import compress_data, decompress_data, encrypt_aes_gcm, decrypt_aes_gcm;
 
-
+total_encrypt_time = 0
+total_packets = 0
 # def set_timestamp(time_arr_out):
 #     # Get nanoseconds and seconds since epoch
 #     nanosec_since_epoch = int(time.time() * 1_000_000_000)
@@ -118,6 +119,9 @@ def main(argv):
 
     demo_data = encrypt_aes_gcm(bytes([123]))
     decrypt_aes_gcm(demo_data)
+
+
+
 
 
     # Keep looping to send multicast messages
@@ -224,8 +228,11 @@ def main(argv):
                 # payload = list(compress_data(bytes(payload)))
                 payload = list(encrypt_aes_gcm(bytes(payload)))
                 end_time = time.time()*1000
-                delay = (end_time - start_time)
-                print("Time taken by encryption/compression: ", round(delay, 3), "ms")
+                global total_encrypt_time, total_packets
+                total_encrypt_time += (end_time - start_time)
+                total_packets +=1
+                print("total packets: ",total_packets)
+                print("Average Time taken by encryption/compression: ", round(total_encrypt_time/total_packets, 3), "ms")
             udp_data.extend(payload)
 
             # Signature Tag = 0x85                
