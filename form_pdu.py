@@ -25,10 +25,17 @@ def set_gse_hardcoded_data(all_data_out, goose_data, loop_data):
     # Length = 0x01
     all_data_out.append(0x01)
 
+
+
     # Read the GOOSE data from file
     goose_counter = goose_data.goose_counter
     file_path = "GOOSEdata.txt"
     
+    with  open(file_path, 'r') as datafile:
+        ans = len(datafile.readlines())
+
+
+
     if not os.path.isfile(file_path):
         print("Failure to open.")
         return
@@ -55,6 +62,9 @@ def set_gse_hardcoded_data(all_data_out, goose_data, loop_data):
     else:
         s_value = goose_data.s_value
     
+    print("Goose_COUNTER : ",goose_data.s_value, " ", ans)
+
+
     # Prevent overflow
     if s_value >= c:
         raise ValueError("s_value exceeds the length of the data.")
@@ -67,6 +77,9 @@ def set_gse_hardcoded_data(all_data_out, goose_data, loop_data):
         all_data_out.append(0x00)
     else:
         all_data_out.append(0x01)
+
+    goose_data.goose_counter %= ans
+    goose_data.goose_counter += 1
 
     # Debugging output to check size of all_data_out
     if len(all_data_out) != 3:
@@ -82,13 +95,13 @@ def set_sv_hardcoded_data(seq_of_data_value, sv_data, loop_data):
     
     line = ""
     with open(file_path, 'r') as datafile:
-        for _ in range(sv_counter):
-            line = datafile.readline().strip()
+        line = datafile.read().strip()
     
     # Using whitespace to count the number of values
     values = line.split()
     v = len(values)
-    
+
+    # print(values)
     # Ensure there are 4 voltage + 4 degree, 4 current + 4 degree values
     if v % 16 != 0:
         raise ValueError("Number of values is not a multiple of 16.")
@@ -100,6 +113,7 @@ def set_sv_hardcoded_data(seq_of_data_value, sv_data, loop_data):
         s_value = sv_data.s_value
     
     s_value *= 16
+
     
     # Skip to the s_value position
     value_list = values[s_value:s_value + 16]
@@ -113,6 +127,13 @@ def set_sv_hardcoded_data(seq_of_data_value, sv_data, loop_data):
         
         ieee_bytes = convert_ieee(float_value)
         seq_of_data_value.extend(ieee_bytes)
+    
+
+    if sv_counter >= s_value:
+        sv_data.sv_counter = 1
+    else:
+        sv_data.sv_counter += 1
+
     
     # Ensure seq_of_data_value field has only the 64 bytes hardcoded from this function
     if len(seq_of_data_value) != 64:

@@ -224,7 +224,7 @@ def main(argv):
             print("Payload length before encryption/compression",len(payload))
 
             start_time = time.time()*1000
-            if  True:
+            if  False:
                 # payload = list(compress_data(bytes(payload)))
                 payload = list(encrypt_aes_gcm(bytes(payload)))
                 end_time = time.time()*1000
