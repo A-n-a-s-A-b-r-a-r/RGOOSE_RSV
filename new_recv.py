@@ -187,7 +187,7 @@ def decode_sv_pdu(data, offset):
             
         # Skip SV PDU tag and length
         pdu_len, offset = decode_asn1_length(data, offset + 1)
-        
+        # print(pdu_len,"----------------------pdu_len")
         while offset < len(data):
             tag = data[offset]
             offset += 1
@@ -195,7 +195,7 @@ def decode_sv_pdu(data, offset):
             
             if offset + length > len(data):
                 break
-                
+
             if tag == 0x80:  # noASDU
                 bytes_data = safe_get_bytes(data, offset, 1)
                 if bytes_data:
@@ -371,14 +371,16 @@ def main():
 
             start_time = time.time()*1000
             if  True:
-                payload = (decrypt_aes_gcm(bytes(payload)))
-                # payload = (decompress_data(bytes(payload)))
+                # payload = (decrypt_aes_gcm(bytes(payload)))
+                payload = (decompress_data(bytes(payload))) 
+
+
                 end_time = time.time()*1000
                 global total_decrypt_time, total_packets
                 total_decrypt_time += (end_time - start_time)
                 total_packets += 1
             
-                print("--------------------------------------------------------------------------------\n\nAverage Time taken by decryption/decompression: ", round((total_decrypt_time/total_packets),3), "ms")
+                print("------------------------------------------------------Average Time taken by decryption/decompression: ", round((total_decrypt_time/total_packets),3), "ms------------------------------------------------------------------------------------")
 
 
             data = headers + list(payload) + signature
@@ -431,17 +433,30 @@ def main():
                     # Move to PDU
                     offset += 6
                     
-                    packet = None
+                    packet1 = None
+                    packet2 = None
+
                     if payload_type == 0x81:  # GOOSE
-                        packet = decode_goose_pdu(data, offset)
+                        packet1 = decode_goose_pdu(data, offset)
+                        offset += 129
+                        packet2 = decode_goose_pdu(data, offset)
                     elif payload_type == 0x82:  # SV
-                        packet = decode_sv_pdu(data, offset)
+                        packet1 = decode_sv_pdu(data, offset)
+                        offset += 130
+                        packet2 = decode_sv_pdu(data, offset)
                 
-                    if packet:
-                        packet.appid = appid
-                        packet.length = length
-                        packet.multicast_ip = addr[0]
-                        display_packet_info(packet)
+                    if packet1:
+                        print("\nPacket1 info: ")
+                        packet1.appid = appid
+                        packet1.length = length
+                        packet1.multicast_ip = addr[0]
+                        display_packet_info(packet1)
+                    if packet2:
+                        print("\nPacket2 info: ")
+                        packet2.appid = appid
+                        packet2.length = length
+                        packet2.multicast_ip = addr[0]
+                        display_packet_info(packet2)
             except Exception as e:
                 print(e) 
                 

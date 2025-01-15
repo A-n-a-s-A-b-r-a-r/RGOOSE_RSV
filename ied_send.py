@@ -136,22 +136,32 @@ def main(argv):
             payload = []
             
             # PDU will be part of Payload
-            pdu = []
+            pdu_1 = []
+            pdu_2 = []
 
             if ownControlBlocks[i].cbType == f"{namespace}GSE":
                 print("cbName", ownControlBlocks[i].cbName)
                 ownControlBlocks[i].s_value = s_value
-                form_goose_pdu(ownControlBlocks[i], pdu)
+                form_goose_pdu(ownControlBlocks[i], pdu_1)
+                ownControlBlocks[i].s_value = s_value
+                s_value += 1
+                form_goose_pdu(ownControlBlocks[i], pdu_2)
                 # Payload Type 0x81: non-tunneled GOOSE APDU
                 payload.append(0x81)
+
+
 
             elif ownControlBlocks[i].cbType == f"{namespace}SMV":
                 # continue
                 print("cbName", ownControlBlocks[i].cbName)
                 ownControlBlocks[i].s_value = s_value
-                form_sv_pdu(ownControlBlocks[i], pdu)
+                form_sv_pdu(ownControlBlocks[i], pdu_1)
+                s_value += 1
+                ownControlBlocks[i].s_value = s_value
+                form_sv_pdu(ownControlBlocks[i], pdu_2)
 
-                print("pdu: ",bytearray(pdu))
+                print("pdu_1: ",(pdu_1))
+                print("pdu_2: ",(pdu_2))
                 # Payload Type 0x82: non-tunneled SV APDU
                 payload.append(0x82)
 
@@ -159,19 +169,44 @@ def main(argv):
             payload.append(0x00)  # Simulation 0x00: Boolean False = payload not sent for test
 
             # APP ID
-
             raw_converted_appid = int(ownControlBlocks[i].appID, 16)
             payload.append((raw_converted_appid >> 8) & 0xFF)
             payload.append(raw_converted_appid & 0xFF)
 
             # APDU Length
-            apdu_len = len(pdu) + 2  # Length of SV or GOOSE PDU plus the APDU Length field itself
+            apdu_len = len(pdu_1) + 2  # Length of SV or GOOSE PDU plus the APDU Length field itself
             payload.append((apdu_len >> 8) & 0xFF)
             payload.append(apdu_len & 0xFF)
 
             # PDU
-            # print("PDU: ",pdu)
-            payload.extend(pdu)
+            # print("PDU: ",pdu_1)
+            payload.extend(pdu_1)
+            
+
+            payload.append(0xff)
+            payload.append(0xff)
+
+
+            if ownControlBlocks[i].cbType == f"{namespace}GSE":
+                payload.append(0x81)
+            if ownControlBlocks[i].cbType == f"{namespace}SMV":
+                payload.append(0x82)
+            
+            # Continue forming Payload
+            payload.append(0x00)  # Simulation 0x00: Boolean False = payload not sent for test
+
+            # APP ID
+            raw_converted_appid = int(ownControlBlocks[i].appID, 16)
+            payload.append((raw_converted_appid >> 8) & 0xFF)
+            payload.append(raw_converted_appid & 0xFF)
+
+            # APDU Length
+            apdu_len = len(pdu_2) + 2  # Length of SV or GOOSE PDU plus the APDU Length field itself
+            payload.append((apdu_len >> 8) & 0xFF)
+            payload.append(apdu_len & 0xFF)
+            
+            # PDU
+            payload.extend(pdu_2)
 
             # Based on RFC-1240 protocol (OSI connectionless transport services on top of UDP)
             udp_data = []
@@ -224,9 +259,9 @@ def main(argv):
             print("Payload length before encryption/compression",len(payload))
 
             start_time = time.time()*1000
-            if  False:
-                # payload = list(compress_data(bytes(payload)))
-                payload = list(encrypt_aes_gcm(bytes(payload)))
+            if  True:
+                payload = list(compress_data(bytes(payload)))
+                # payload = list(encrypt_aes_gcm(bytes(payload)))
                 end_time = time.time()*1000
                 global total_encrypt_time, total_packets
                 total_encrypt_time += (end_time - start_time)
