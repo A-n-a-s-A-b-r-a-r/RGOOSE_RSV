@@ -272,7 +272,8 @@ def form_goose_pdu(goose_data, pdu_out):
     pdu_out.extend(go_id_value)
 
     pdu_out.extend([time_tag, time_len])
-    pdu_out.extend(time_value)
+    pdu_out.extend(time_value)     # before
+    # pdu_out.extend(set_timestamp()) # after
 
     pdu_out.extend([st_num_tag, st_num_len])
     # print("sdfghj",len(list(convert_uint32_to_bytes(time_allowed_to_live_value))))
@@ -348,15 +349,16 @@ def form_sv_pdu(sv_data, pdu_out):
     seq_of_data_len = 0
     seq_of_data_value = []
 
+    # SV ASDU -> t
+    time_tag = 0x89
+    time_len = 0x08
+    time_value = set_timestamp()
+
     # HARDCODED Sample Data in this implementation
     set_sv_hardcoded_data(seq_of_data_value, sv_data, True)
 
     seq_of_data_len = len(seq_of_data_value)
 
-    # SV ASDU -> t
-    time_tag = 0x89
-    time_len = 0x08
-    time_value = set_timestamp()
 
     # Set smpCnt Value (assume 50Hz)
     if sv_data.prev_smpCnt_Value != 3999:
@@ -396,7 +398,8 @@ def form_sv_pdu(sv_data, pdu_out):
 
     asdu_content.append(time_tag)
     asdu_content.append(time_len)
-    asdu_content.extend(time_value)
+    asdu_content.extend(time_value) #before
+    # asdu_content.extend(set_timestamp()) #after
 
     # Set ASDU Length
     asdu_len = len(asdu_content)

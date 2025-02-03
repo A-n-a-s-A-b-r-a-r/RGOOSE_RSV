@@ -161,7 +161,7 @@ def main(argv):
                 form_sv_pdu(ownControlBlocks[i], pdu_2)
 
                 print("pdu_1: ",(pdu_1))
-                print("pdu_2: ",(pdu_2))
+                # print("pdu_2: ",(pdu_2))
                 # Payload Type 0x82: non-tunneled SV APDU
                 payload.append(0x82)
 
@@ -182,6 +182,9 @@ def main(argv):
             # print("PDU: ",pdu_1)
             payload.extend(pdu_1)
             
+
+
+
 
             payload.append(0xff)
             payload.append(0xff)
@@ -207,6 +210,13 @@ def main(argv):
             
             # PDU
             payload.extend(pdu_2)
+
+
+
+
+
+
+
 
             # Based on RFC-1240 protocol (OSI connectionless transport services on top of UDP)
             udp_data = []
@@ -260,7 +270,7 @@ def main(argv):
 
             start_time = time.time()*1000
             if  True:
-                payload = list(compress_data(bytes(payload)))
+                # payload = list(compress_data(bytes(payload)))
                 # payload = list(encrypt_aes_gcm(bytes(payload)))
                 end_time = time.time()*1000
                 global total_encrypt_time, total_packets
