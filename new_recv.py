@@ -95,7 +95,7 @@ def decode_goose_pdu(data, offset):
     try:
         packet = ReceivedPacket(packet_type='GOOSE', 
                                appid=0, length=0, 
-                               timestamp= 0,
+                               timestamp= time.time(),
                                multicast_ip='')
         
         # Skip GOOSE PDU tag
@@ -132,14 +132,6 @@ def decode_goose_pdu(data, offset):
                 bytes_data = safe_get_bytes(data, offset, length)
                 if bytes_data and len(bytes_data) == 8:  # Ensure we have 8 bytes for double
                     packet.timestamp = struct.unpack('>d', bytes_data)[0]
-
-                    given_datetime = packet.timestamp
-                    current_datetime = time.time()
-                    print(datetime.fromtimestamp(current_datetime) , " " ,datetime.fromtimestamp(given_datetime))
-                    time_difference_ms = (current_datetime - given_datetime) * 1000 
-                    print("Goose Transmission time-----------------------------------: ",round(time_difference_ms, 6), " ms")
-
-
             elif tag == 0x85:  # stNum
                 bytes_data = safe_get_bytes(data, offset, length)
                 if bytes_data:
@@ -187,7 +179,7 @@ def decode_sv_pdu(data, offset):
     try:
         packet = ReceivedPacket(packet_type='SV',
                                appid=0, length=0,
-                               timestamp=0,
+                               timestamp=time.time(),
                                multicast_ip='')
         
         if offset >= len(data):
@@ -195,7 +187,7 @@ def decode_sv_pdu(data, offset):
             
         # Skip SV PDU tag and length
         pdu_len, offset = decode_asn1_length(data, offset + 1)
-        # print(pdu_len,"----------------------pdu_len")
+        
         while offset < len(data):
             tag = data[offset]
             offset += 1
@@ -203,7 +195,7 @@ def decode_sv_pdu(data, offset):
             
             if offset + length > len(data):
                 break
-
+                
             if tag == 0x80:  # noASDU
                 bytes_data = safe_get_bytes(data, offset, 1)
                 if bytes_data:
@@ -249,13 +241,6 @@ def decode_sv_pdu(data, offset):
                                 if bytes_data and len(bytes_data) == 8:
                                     packet.timestamp = struct.unpack('>d', bytes_data)[0]
 
-                                    given_datetime = packet.timestamp
-                                    current_datetime = time.time()
-                                    print(datetime.fromtimestamp(current_datetime) , " " ,datetime.fromtimestamp(given_datetime))
-                                    time_difference_ms = (current_datetime - given_datetime) * 1000 
-                                    print("SV Transmission time-----------------------------------: ",round(time_difference_ms, 6), " ms")
-                                    # ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
                             
                             inner_offset += inner_len
                         
@@ -294,6 +279,8 @@ def display_packet_info(packet):
     time_difference_ms = (current_datetime - given_datetime) * 1000
 
     print("Transmission time: ",round(time_difference_ms, 6), " ms")
+    
+
 
 
     print(f"APPID: 0x{packet.appid:04x}")
@@ -382,20 +369,16 @@ def main():
             headers = list(data[:32])
             signature = list(data[-2:])
 
-            start_time = (time.time())
-            # print("packet receired without decode",datetime.fromtimestamp(start_time))
-
+            start_time = time.time()*1000
             if  True:
                 # payload = (decrypt_aes_gcm(bytes(payload)))
-                # payload = (decompress_data(bytes(payload))) 
-
-
+                # payload = (decompress_data(bytes(payload)))
                 end_time = time.time()*1000
                 global total_decrypt_time, total_packets
                 total_decrypt_time += (end_time - start_time)
                 total_packets += 1
             
-                print("------------------------------------------------------Average Time taken by decryption/decompression: ", round((total_decrypt_time/total_packets),3), "ms------------------------------------------------------------------------------------")
+                print("--------------------------------------------------------------------------------\n\nAverage Time taken by decryption/decompression: ", round((total_decrypt_time/total_packets),3), "ms")
 
 
             data = headers + list(payload) + signature
@@ -448,30 +431,20 @@ def main():
                     # Move to PDU
                     offset += 6
                     
-                    packet1 = None
-                    packet2 = None
-                    prev_offset = offset
+                    packet = None
+
                     if payload_type == 0x81:  # GOOSE
-                        offset += 129
-                        packet2 = decode_goose_pdu(data, offset)
-                        packet1 = decode_goose_pdu(data, prev_offset)
+                        # offset += 129
+                        packet = decode_goose_pdu(data, offset)
                     elif payload_type == 0x82:  # SV
-                        offset += 130
-                        packet2 = decode_sv_pdu(data, offset)
-                        packet1 = decode_sv_pdu(data, prev_offset)
+                        # offset += 130
+                        packet = decode_sv_pdu(data, offset)
                 
-                    if packet2:
-                        print("\nPacket2 info: ")
-                        packet2.appid = appid
-                        packet2.length = length
-                        packet2.multicast_ip = addr[0]
-                        display_packet_info(packet2)
-                    if packet1:
-                        print("\nPacket1 info: ")
-                        packet1.appid = appid
-                        packet1.length = length
-                        packet1.multicast_ip = addr[0]
-                        display_packet_info(packet1)
+                    if packet:
+                        packet.appid = appid
+                        packet.length = length
+                        packet.multicast_ip = addr[0]
+                        display_packet_info(packet)
             except Exception as e:
                 print(e) 
                 

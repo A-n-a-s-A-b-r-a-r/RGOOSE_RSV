@@ -143,9 +143,14 @@ def main(argv):
                 print("cbName", ownControlBlocks[i].cbName)
                 ownControlBlocks[i].s_value = s_value
                 form_goose_pdu(ownControlBlocks[i], pdu_1)
-                ownControlBlocks[i].s_value = s_value
+                
+                
                 s_value += 1
+                ownControlBlocks[i].s_value = s_value
                 form_goose_pdu(ownControlBlocks[i], pdu_2)
+
+
+
                 # Payload Type 0x81: non-tunneled GOOSE APDU
                 payload.append(0x81)
 
@@ -156,12 +161,14 @@ def main(argv):
                 print("cbName", ownControlBlocks[i].cbName)
                 ownControlBlocks[i].s_value = s_value
                 form_sv_pdu(ownControlBlocks[i], pdu_1)
+                
+                
                 s_value += 1
                 ownControlBlocks[i].s_value = s_value
                 form_sv_pdu(ownControlBlocks[i], pdu_2)
 
-                print("pdu_1: ",(pdu_1))
-                # print("pdu_2: ",(pdu_2))
+
+
                 # Payload Type 0x82: non-tunneled SV APDU
                 payload.append(0x82)
 
@@ -210,11 +217,6 @@ def main(argv):
             
             # PDU
             payload.extend(pdu_2)
-
-
-
-
-
 
 
 
@@ -269,8 +271,8 @@ def main(argv):
             print("Payload length before encryption/compression",len(payload))
 
             start_time = time.time()*1000
-            if  True:
-                # payload = list(compress_data(bytes(payload)))
+            if  not True:
+                payload = list(compress_data(bytes(payload)))
                 # payload = list(encrypt_aes_gcm(bytes(payload)))
                 end_time = time.time()*1000
                 global total_encrypt_time, total_packets
