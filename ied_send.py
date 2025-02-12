@@ -21,6 +21,7 @@ from compression_encryption import compress_data, decompress_data, encrypt_aes_g
 
 total_encrypt_time = 0
 total_packets = 0
+encrypt_compress = True
 # def set_timestamp(time_arr_out):
 #     # Get nanoseconds and seconds since epoch
 #     nanosec_since_epoch = int(time.time() * 1_000_000_000)
@@ -262,16 +263,21 @@ def main(argv):
             
             # Security information added for testing purpose using AES GCM
             # Comment this part when not using encryption and instead just add 12 bytes of padding
-            timestamp = int(time.time()).to_bytes(4, 'big')  # Current timestamp
-            udp_data.extend(timestamp)
-            key_rotation_minutes = (60).to_bytes(2, 'big')  # 1-hour key rotation
-            udp_data.extend(key_rotation_minutes)
-            encryption_algorithm = b'\x01'  # Example: AES-GCM
-            message_auth_algorithm = b'\x02'  # Example: HMAC-SHA256-128
-            udp_data.extend(encryption_algorithm)
-            udp_data.extend(message_auth_algorithm)
-            key_id = os.urandom(4)  # Use a random 4-byte key ID
-            udp_data.extend(key_id)
+            if encrypt_compress :
+                timestamp = int(time.time()).to_bytes(4, 'big')  # Current timestamp
+                udp_data.extend(timestamp)
+                key_rotation_minutes = (60).to_bytes(2, 'big')  # 1-hour key rotation
+                udp_data.extend(key_rotation_minutes)
+                encryption_algorithm = b'\x01'  # Example: AES-GCM
+                message_auth_algorithm = b'\x02'  # Example: HMAC-SHA256-128
+                udp_data.extend(encryption_algorithm)
+                udp_data.extend(message_auth_algorithm)
+                key_id = os.urandom(4)  # Use a random 4-byte key ID
+                udp_data.extend(key_id)
+            else :
+                for _ in range(12):
+                   udp_data.append(0x00)
+                
 
             # Form the Session User Information: prepend Payload Length to & append Signature to the Payload
             payload_len = len(payload) + 4  # Length of Payload plus Payload Length field itself
@@ -284,7 +290,7 @@ def main(argv):
             print("Payload length before encryption/compression",len(payload))
 
             start_time = time.time()*1000
-            if  True:
+            if  encrypt_compress:
                 # payload = list(compress_data(bytes(payload)))
                 payload = list(encrypt_aes_gcm(bytes(payload)))
                 end_time = time.time()*1000
