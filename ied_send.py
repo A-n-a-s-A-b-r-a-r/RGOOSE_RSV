@@ -26,6 +26,7 @@ from compression_encryption import generate_hmac_cryptography
 
 total_encrypt_time = 0
 total_packets = 0
+encrypt_compress = True
 # def set_timestamp(time_arr_out):
 #     # Get nanoseconds and seconds since epoch
 #     nanosec_since_epoch = int(time.time() * 1_000_000_000)
