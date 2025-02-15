@@ -10,6 +10,10 @@ from compression_encryption import decrypt_aes_gcm, decompress_data ,encrypt_aes
 from ied_utils import getIPv4Add
 from parse_sed import parse_sed
 
+
+from compression_encryption import key
+from compression_encryption import generate_hmac_cryptography
+
 @dataclass
 class ReceivedPacket:
     packet_type: str  # 'GOOSE' or 'SV'
@@ -365,14 +369,18 @@ def main():
         while True:
             data, addr = sock.recvfrom(65535)
             
-            payload = data[32:-2]
             headers = list(data[:32])
-            signature = list(data[-2:])
+            payload = data[32:-34]
+            signature = list(data[-34:])
+            t1 = time.time()
+            mac = generate_hmac_cryptography(key, list(data[:-32]))
+            t2 = time.time()
+            print(t2-t1, "mac generation time")
 
             start_time = time.time()*1000
             if  True:
-                # payload = (decrypt_aes_gcm(bytes(payload)))
-                # payload = (decompress_data(bytes(payload)))
+                payload = (decrypt_aes_gcm(bytes(payload)))
+                payload = (decompress_data(bytes(payload)))
                 end_time = time.time()*1000
                 global total_decrypt_time, total_packets
                 total_decrypt_time += (end_time - start_time)
@@ -380,11 +388,18 @@ def main():
             
                 print("--------------------------------------------------------------------------------\n\nAverage Time taken by decryption/decompression: ", round((total_decrypt_time/total_packets),3), "ms")
 
+            # print(type(mac), list(mac))
+            # print(type(signature), signature[2:])
+
+            
+            if list(mac) != signature[2:]:
+                print("MAC mismatch")
+                continue
 
             data = headers + list(payload) + signature
             data = bytearray(data)
 
-            
+
             if len(data) < 4:  # Minimum required length
                 continue
                 

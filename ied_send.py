@@ -19,9 +19,13 @@ IEDUDPPORT = 102
 from form_pdu import form_goose_pdu, form_sv_pdu
 from compression_encryption import compress_data, decompress_data, encrypt_aes_gcm, decrypt_aes_gcm;
 
+from compression_encryption import key
+from compression_encryption import generate_hmac_cryptography
+
+
+
 total_encrypt_time = 0
 total_packets = 0
-encrypt_compress = True
 # def set_timestamp(time_arr_out):
 #     # Get nanoseconds and seconds since epoch
 #     nanosec_since_epoch = int(time.time() * 1_000_000_000)
@@ -146,9 +150,9 @@ def main(argv):
                 form_goose_pdu(ownControlBlocks[i], pdu_1)
                 
                 
-                s_value += 1
-                ownControlBlocks[i].s_value = s_value
-                form_goose_pdu(ownControlBlocks[i], pdu_2)
+                # s_value += 1
+                # ownControlBlocks[i].s_value = s_value
+                # form_goose_pdu(ownControlBlocks[i], pdu_2)
 
 
 
@@ -164,9 +168,9 @@ def main(argv):
                 form_sv_pdu(ownControlBlocks[i], pdu_1)
                 
                 
-                s_value += 1
-                ownControlBlocks[i].s_value = s_value
-                form_sv_pdu(ownControlBlocks[i], pdu_2)
+                # s_value += 1
+                # ownControlBlocks[i].s_value = s_value
+                # form_sv_pdu(ownControlBlocks[i], pdu_2)
 
 
 
@@ -194,30 +198,30 @@ def main(argv):
 
 
 
-            payload.append(0xff)
-            payload.append(0xff)
+            # payload.append(0xff)
+            # payload.append(0xff)
 
 
-            if ownControlBlocks[i].cbType == f"{namespace}GSE":
-                payload.append(0x81)
-            if ownControlBlocks[i].cbType == f"{namespace}SMV":
-                payload.append(0x82)
+            # if ownControlBlocks[i].cbType == f"{namespace}GSE":
+            #     payload.append(0x81)
+            # if ownControlBlocks[i].cbType == f"{namespace}SMV":
+            #     payload.append(0x82)
             
-            # Continue forming Payload
-            payload.append(0x00)  # Simulation 0x00: Boolean False = payload not sent for test
+            # # Continue forming Payload
+            # payload.append(0x00)  # Simulation 0x00: Boolean False = payload not sent for test
 
-            # APP ID
-            raw_converted_appid = int(ownControlBlocks[i].appID, 16)
-            payload.append((raw_converted_appid >> 8) & 0xFF)
-            payload.append(raw_converted_appid & 0xFF)
+            # # APP ID
+            # raw_converted_appid = int(ownControlBlocks[i].appID, 16)
+            # payload.append((raw_converted_appid >> 8) & 0xFF)
+            # payload.append(raw_converted_appid & 0xFF)
 
-            # APDU Length
-            apdu_len = len(pdu_2) + 2  # Length of SV or GOOSE PDU plus the APDU Length field itself
-            payload.append((apdu_len >> 8) & 0xFF)
-            payload.append(apdu_len & 0xFF)
+            # # APDU Length
+            # apdu_len = len(pdu_2) + 2  # Length of SV or GOOSE PDU plus the APDU Length field itself
+            # payload.append((apdu_len >> 8) & 0xFF)
+            # payload.append(apdu_len & 0xFF)
             
-            # PDU
-            payload.extend(pdu_2)
+            # # PDU
+            # payload.extend(pdu_2)
 
 
 
@@ -254,30 +258,21 @@ def main(argv):
             udp_data.append(current_SPDUNum & 0xFF)
 
             # Version Number (fixed 2-byte unsigned integer, assigned to 1 in this implementation)
+
+            
             udp_data.append(0x00)
             udp_data.append(0x01)
             
-            # # Security Information (not used in this implementation, hence set to 0's)
-            # for _ in range(12):
-            #     udp_data.append(0x00)
-            
-            # Security information added for testing purpose using AES GCM
-            # Comment this part when not using encryption and instead just add 12 bytes of padding
-            if encrypt_compress :
-                timestamp = int(time.time()).to_bytes(4, 'big')  # Current timestamp
-                udp_data.extend(timestamp)
-                key_rotation_minutes = (60).to_bytes(2, 'big')  # 1-hour key rotation
-                udp_data.extend(key_rotation_minutes)
-                encryption_algorithm = b'\x01'  # Example: AES-GCM
-                message_auth_algorithm = b'\x02'  # Example: HMAC-SHA256-128
-                udp_data.extend(encryption_algorithm)
-                udp_data.extend(message_auth_algorithm)
-                key_id = os.urandom(4)  # Use a random 4-byte key ID
-                udp_data.extend(key_id)
-            else :
-                for _ in range(12):
-                   udp_data.append(0x00)
-                
+            timestamp = int(time.time()).to_bytes(4, 'big')  # Current timestamp
+            udp_data.extend(timestamp)
+            key_rotation_minutes = (60).to_bytes(2, 'big')  # 1-hour key rotation
+            udp_data.extend(key_rotation_minutes)
+            encryption_algorithm = b'\x01'  # Example: AES-GCM
+            message_auth_algorithm = b'\x02'  # Example: HMAC-SHA256-128
+            udp_data.extend(encryption_algorithm)
+            udp_data.extend(message_auth_algorithm)
+            key_id = os.urandom(4)  # Use a random 4-byte key ID
+            udp_data.extend(key_id)
 
             # Form the Session User Information: prepend Payload Length to & append Signature to the Payload
             payload_len = len(payload) + 4  # Length of Payload plus Payload Length field itself
@@ -289,23 +284,32 @@ def main(argv):
             print(len(udp_data))
             print("Payload length before encryption/compression",len(payload))
 
+            
+
             start_time = time.time()*1000
-            if  encrypt_compress:
-                # payload = list(compress_data(bytes(payload)))
+            if  True:
+                payload = list(compress_data(bytes(payload)))
                 payload = list(encrypt_aes_gcm(bytes(payload)))
                 end_time = time.time()*1000
                 global total_encrypt_time, total_packets
                 total_encrypt_time += (end_time - start_time)
                 total_packets +=1
                 print("total packets: ",total_packets)
+                print("Time taken by encryption/compression: ", round(end_time - start_time, 3), "ms")
                 print("Average Time taken by encryption/compression: ", round(total_encrypt_time/total_packets, 3), "ms")
+
             udp_data.extend(payload)
 
             # Signature Tag = 0x85                
             udp_data.append(0x85)
+            
+            # Length of HMAC 
+            udp_data.append(0x20)
 
-            # Length of HMAC considered as zero in this implementation
-            udp_data.append(0x00)  # Application Profile = UDP Data completely formed here
+            t1  = time.time()
+            udp_data.extend(generate_hmac_cryptography(key, udp_data))
+            t2  = time.time()
+            print("Mac generation time : ", t2-t1)
 
             
             sock = UdpSock()
