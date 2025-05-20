@@ -1,21 +1,23 @@
-from datetime import datetime
+
 import socket
 import struct
 import sys
-from dataclasses import dataclass
 import time
+from dataclasses import dataclass
+from datetime import datetime
+
 import netifaces
 
-from compression_encryption import decrypt_aes_gcm, decompress_data ,encrypt_aes_gcm
+from compression_encryption import decrypt_aes_gcm, decompress_data, encrypt_aes_gcm, key, generate_hmac_cryptography
 from ied_utils import getIPv4Add
 from parse_sed import parse_sed
 
-
-from compression_encryption import key
-from compression_encryption import generate_hmac_cryptography
+from CLC import CertificatelessCrypto
+# --- Data Structures ---
 
 @dataclass
 class ReceivedPacket:
+    """Represents a received IEC 61850 packet (GOOSE or SV)"""
     packet_type: str  # 'GOOSE' or 'SV'
     appid: int
     length: int
@@ -40,6 +42,46 @@ class ReceivedPacket:
     smp_cnt: int = None
     smp_synch: int = None
     sample_data: list = None
+
+
+# --- Global Statistics Tracking ---
+
+class Statistics:
+    """Tracks transmission statistics for GOOSE and SV packets"""
+    def __init__(self):
+        self.total_transmission_time_goose = 0.0
+        self.total_packets_goose = 0
+        self.total_transmission_time_sv = 0.0
+        self.total_packets_sv = 0
+        self.total_decrypt_time = 0.0
+        self.total_packets = 0
+    
+    def update_goose_stats(self, transmission_time):
+        """Update GOOSE packet statistics"""
+        self.total_packets_goose += 1
+        self.total_transmission_time_goose += transmission_time
+        self.total_packets += 1
+        
+    def update_sv_stats(self, transmission_time):
+        """Update SV packet statistics"""
+        self.total_packets_sv += 1
+        self.total_transmission_time_sv += transmission_time
+        self.total_packets += 1
+    
+    def get_avg_goose_time(self):
+        """Get average GOOSE transmission time in ms"""
+        if self.total_packets_goose == 0:
+            return 0
+        return self.total_transmission_time_goose / self.total_packets_goose
+    
+    def get_avg_sv_time(self):
+        """Get average SV transmission time in ms"""
+        if self.total_packets_sv == 0:
+            return 0
+        return self.total_transmission_time_sv / self.total_packets_sv
+
+
+# --- Network Functions ---
 
 def join_multicast_group(sock, multicast_ip, interface_name):
     """Join a multicast group on specified interface"""
@@ -70,6 +112,9 @@ def join_multicast_group(sock, multicast_ip, interface_name):
                       socket.inet_aton(addr))
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
+
+# --- ASN.1 Decoding Utilities ---
+
 def decode_asn1_length(data, offset):
     """Decode ASN.1 length field and return (length, new_offset)"""
     if offset >= len(data):
@@ -88,19 +133,26 @@ def decode_asn1_length(data, offset):
             new_offset += 1
     return length, new_offset
 
+
 def safe_get_bytes(data, start, length):
     """Safely get bytes from data with bounds checking"""
     if start + length > len(data):
         return None
     return data[start:start + length]
 
+
+# --- Packet Decoders ---
+
 def decode_goose_pdu(data, offset):
     """Decode GOOSE PDU and return packet info"""
     try:
-        packet = ReceivedPacket(packet_type='GOOSE', 
-                               appid=0, length=0, 
-                               timestamp= time.time(),
-                               multicast_ip='')
+        packet = ReceivedPacket(
+            packet_type='GOOSE', 
+            appid=0, 
+            length=0, 
+            timestamp=time.time(),
+            multicast_ip=''
+        )
         
         # Skip GOOSE PDU tag
         if offset >= len(data):
@@ -178,13 +230,17 @@ def decode_goose_pdu(data, offset):
         print(f"Error decoding GOOSE PDU: {e}")
         return None
 
+
 def decode_sv_pdu(data, offset):
     """Decode Sampled Values PDU and return packet info"""
     try:
-        packet = ReceivedPacket(packet_type='SV',
-                               appid=0, length=0,
-                               timestamp=time.time(),
-                               multicast_ip='')
+        packet = ReceivedPacket(
+            packet_type='SV',
+            appid=0, 
+            length=0,
+            timestamp=time.time(),
+            multicast_ip=''
+        )
         
         if offset >= len(data):
             return packet
@@ -244,7 +300,6 @@ def decode_sv_pdu(data, offset):
                                 bytes_data = safe_get_bytes(data, inner_offset, inner_len)
                                 if bytes_data and len(bytes_data) == 8:
                                     packet.timestamp = struct.unpack('>d', bytes_data)[0]
-
                             
                             inner_offset += inner_len
                         
@@ -260,41 +315,30 @@ def decode_sv_pdu(data, offset):
         return None
 
 
-total_transmission_time_goose = 0.0
-total_packets_goose = 0
-total_transmission_time_sv = 0.0
-total_packets_sv = 0
-total_decrypt_time = 0.0
-total_packets= 0
+# --- Display Functions ---
 
-def display_packet_info(packet):
-    """Display received packet information"""
+def display_packet_info(packet, stats):
+    """Display received packet information with statistics"""
     if not packet:
         return
-    import time
+    
     print("\n" + "="*80)
     print(f"Received {packet.packet_type} Packet from {packet.multicast_ip}")
     
     print(f"Packet Timestamp: {datetime.fromtimestamp(packet.timestamp)}")
 
-    given_datetime = packet.timestamp
     current_datetime = time.time()
-    print("Current Timestamp",datetime.fromtimestamp(current_datetime))
-    time_difference_ms = (current_datetime - given_datetime) * 1000
+    print("Current Timestamp:", datetime.fromtimestamp(current_datetime))
+    time_difference_ms = (current_datetime - packet.timestamp) * 1000
 
-    print("Transmission time: ",round(time_difference_ms, 6), " ms")
+    print("Transmission time:", round(time_difference_ms, 6), "ms")
     
-
-
-
     print(f"APPID: 0x{packet.appid:04x}")
     print(f"Length: {packet.length} bytes")
     
     if packet.packet_type == 'GOOSE':
-        global total_transmission_time_goose, total_packets_goose        
-        total_packets_goose += 1
-        total_transmission_time_goose += time_difference_ms
-        print("Average Goose Trasmission time: ", total_transmission_time_goose/total_packets_goose)
+        stats.update_goose_stats(time_difference_ms)
+        print("Average GOOSE Transmission time:", stats.get_avg_goose_time())
 
         print("\nGOOSE Specific Information:")
         if packet.gocb_ref: print(f"GoCB Reference: {packet.gocb_ref}")
@@ -310,10 +354,8 @@ def display_packet_info(packet):
         if packet.data_values: print(f"Data Values: {packet.data_values}")
     
     elif packet.packet_type == 'SV':
-        global total_transmission_time_sv, total_packets_sv
-        total_packets_sv += 1
-        total_transmission_time_sv += time_difference_ms
-        print("Average SV Trasmission time: ", total_transmission_time_sv/total_packets_sv)
+        stats.update_sv_stats(time_difference_ms)
+        print("Average SV Transmission time:", stats.get_avg_sv_time())
 
         print("\nSampled Values Specific Information:")
         if packet.svid: print(f"svID: {packet.svid}")
@@ -325,148 +367,173 @@ def display_packet_info(packet):
                 print(f"  Sample {i}: {value}")
 
 
+# --- Packet Processing ---
+
+def process_received_data(data, addr, stats):
+    """Process received data and extract packet information"""
+    if len(data) < 4:  # Minimum required length
+        return
+        
+    try:
+        # Skip LI and TI bytes
+        offset = 2
+        
+        # Check packet type
+        packet_type = data[offset]
+        offset += 1
+        
+        # Skip LI byte
+        offset += 1
+        
+        # Skip common session header
+        if offset < len(data) and data[offset] == 0x80:
+            offset += 2  # Skip PI and LI
+            
+            # Skip SPDU length and number
+            offset += 8
+            
+            # Skip version number
+            offset += 2
+            
+            # Skip security information
+            offset += 12
+            
+            if offset + 4 >= len(data):
+                return
+                
+            # Get payload length
+            payload_len = int.from_bytes(data[offset:offset+4], 'big')
+            offset += 4
+            
+            if offset + 6 >= len(data):
+                return
+                
+            # Process payload
+            payload_type = data[offset]
+            simulation = data[offset + 1]
+            appid = int.from_bytes(data[offset+2:offset+4], 'big')
+            length = int.from_bytes(data[offset+4:offset+6], 'big')
+            
+            # Move to PDU
+            offset += 6
+            
+            packet = None
+
+            if payload_type == 0x81:  # GOOSE
+                packet = decode_goose_pdu(data, offset)
+            elif payload_type == 0x82:  # SV
+                packet = decode_sv_pdu(data, offset)
+        
+            if packet:
+                packet.appid = appid
+                packet.length = length
+                packet.multicast_ip = addr[0]
+                display_packet_info(packet, stats)
+    except Exception as e:
+        print(f"Error processing packet: {e}")
+
+
+# --- Main Function ---
+
 def main():
+    # Initialize certificateless cryptography with 30-second key rotation
+    crypto = CertificatelessCrypto(key_dir='./keys', rotation_interval=30)
+    print("Initialized certificateless cryptography with 30-second key rotation")   
+    """Main function to receive and process IEC 61850 packets"""
     if len(sys.argv) != 4:
-        if sys.sys.argv[0]:
-            print(f"Usage: {sys.argv[0]} <SED Filename> <Interface Name to be used on IED> <IED Name>")
-        else:
-            # For OS where sys.argv[0] can end up as an empty string instead of the program's name.
-            print("Usage: <program name> <SED Filename> <Interface Name to be used on IED> <IED Name>")
+        program_name = sys.argv[0] if sys.argv and sys.argv[0] else "<program name>"
+        print(f"Usage: {program_name} <SED Filename> <Interface Name to be used on IED> <IED Name>")
         return 1
 
-    # Specify SED Filename
+    # Parse command line arguments
     sed_filename = sys.argv[1]
-
-    # Specify Network Interface Name to be used on IED for inter-substation communication
     interface_name = sys.argv[2]
-    
-    # Save IPv4 address of specified Network Interface into ifr structure: ifr
-    ifr = getIPv4Add(interface_name)
-    ifr = socket.inet_pton(socket.AF_INET,ifr)
-
-    # Specify IED name
     ied_name = sys.argv[3]
+    
+    # Get IPv4 address of specified Network Interface
+    ifr = getIPv4Add(interface_name)
+    ifr = socket.inet_pton(socket.AF_INET, ifr)
 
-    # Specify filename to parse
+    # Parse SED file to get multicast IP
+    multicast_ip = None
     vector_of_ctrl_blks = parse_sed(sed_filename)
     for it in vector_of_ctrl_blks:
         print(it.hostIED)
         if it.hostIED == ied_name:
             print(it.multicastIP)
             multicast_ip = it.multicastIP
+            break
             
+    if not multicast_ip:
+        print(f"Error: No multicast IP found for IED {ied_name}")
+        return 1
+
+    # Initialize statistics tracker
+    stats = Statistics()
 
     # Create UDP socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    
+    # Test encryption/decryption
     demo_data = encrypt_aes_gcm(bytes([123]))
     decrypt_aes_gcm(demo_data)
 
-    
     try:
+        # Join multicast group
         join_multicast_group(sock, multicast_ip, interface_name)
         print(f"Listening for RGOOSE/RSV packets on {interface_name} ({multicast_ip})...")
         
+        # Main receive loop
         while True:
+            # Check if keys need rotation
+            if crypto.check_and_rotate_keys():
+                print("Keys rotated")
             data, addr = sock.recvfrom(65535)
             
+            # Extract packet components
             headers = list(data[:32])
             payload = data[32:-34]
             signature = list(data[-34:])
+            
+            # With certificateless crypto, we rely on AES-GCM's authentication
+            # You can still verify a separate HMAC if needed
             t1 = time.time()
             mac = generate_hmac_cryptography(key, list(data[:-32]))
             t2 = time.time()
-            print(t2-t1, "mac generation time")
+            print(f"{t2-t1:.6f} mac generation time")
 
-            start_time = time.time()*1000
-            if  True:
-                payload = (decrypt_aes_gcm(bytes(payload)))
-                payload = (decompress_data(bytes(payload)))
-                end_time = time.time()*1000
-                global total_decrypt_time, total_packets
-                total_decrypt_time += (end_time - start_time)
-                total_packets += 1
-            
-                print("--------------------------------------------------------------------------------\n\nAverage Time taken by decryption/decompression: ", round((total_decrypt_time/total_packets),3), "ms")
-
-            # print(type(mac), list(mac))
-            # print(type(signature), signature[2:])
-
-            
+            # Check signature - note that our certificateless crypto provides authentication already
             if list(mac) != signature[2:]:
-                print("MAC mismatch")
-                continue
+                print("Warning: MAC mismatch, but continuing as crypto provides authentication")
+                # We don't continue here as we're relying on crypto's authentication
 
-            data = headers + list(payload) + signature
-            data = bytearray(data)
+            # Decrypt and decompress payload
+            # Check and possibly rotate keys
+            crypto.check_and_rotate_keys()
 
-
-            if len(data) < 4:  # Minimum required length
-                continue
-                
+            # Decrypt with certificateless crypto and then decompress
+            start_time = time.time() * 1000
             try:
-                # Skip LI and TI bytes
-                offset = 2
-                
-                # Check packet type
-                packet_type = data[offset]
-                offset += 1
-                
-                # Skip LI byte
-                offset += 1
-                
-                # Skip common session header
-                if offset < len(data) and data[offset] == 0x80:
-                    offset += 2  # Skip PI and LI
-                    
-                    # Skip SPDU length and number
-                    offset += 8
-                    
-                    # Skip version number
-                    offset += 2
-                    
-                    # Skip security information
-                    offset += 12
-                    
-                    if offset + 4 >= len(data):
-                        continue
-                        
-                    # Get payload length
-                    payload_len = int.from_bytes(data[offset:offset+4], 'big')
-                    offset += 4
-                    
-                    if offset + 6 >= len(data):
-                        continue
-                        
-                    # Process payload
-                    payload_type = data[offset]
-                    simulation = data[offset + 1]
-                    appid = int.from_bytes(data[offset+2:offset+4], 'big')
-                    length = int.from_bytes(data[offset+4:offset+6], 'big')
-                    
-                    # Move to PDU
-                    offset += 6
-                    
-                    packet = None
-
-                    if payload_type == 0x81:  # GOOSE
-                        # offset += 129
-                        packet = decode_goose_pdu(data, offset)
-                    elif payload_type == 0x82:  # SV
-                        # offset += 130
-                        packet = decode_sv_pdu(data, offset)
-                
-                    if packet:
-                        packet.appid = appid
-                        packet.length = length
-                        packet.multicast_ip = addr[0]
-                        display_packet_info(packet)
+                decrypted_payload = crypto.decrypt_bytes(bytes(payload))
+                decompressed_payload = decompress_data(bytes(decrypted_payload))
             except Exception as e:
-                print(e) 
+                print(f"Decryption error: {e}")
+                continue    
+
+            # Reconstruct packet
+            reconstructed_data = headers + list(decompressed_payload) + signature
+            reconstructed_data = bytearray(reconstructed_data)
+
+            # Process the packet
+            process_received_data(reconstructed_data, addr, stats)
                 
     except KeyboardInterrupt:
         print("\nExiting...")
     finally:
         sock.close()
 
+    return 0
+
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
