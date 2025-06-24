@@ -93,8 +93,8 @@ class CertificatelessCrypto:
             format=serialization.PrivateFormat.PKCS8,
             encryption_algorithm=serialization.NoEncryption()
         )
-        with open(os.path.join(self.key_dir, 'private_key.pem'), 'wb') as f:
-            f.write(private_key_pem)
+        # with open(os.path.join(self.key_dir, 'private_key.pem'), 'wb') as f:
+        #     f.write(private_key_pem)
         
         # Save public key for sharing
         public_key_pem = self.public_key.public_bytes(
@@ -148,6 +148,9 @@ class CertificatelessCrypto:
             recipient_key
         )
         
+        shared_key_partial = ephemeral_private_key.exchange(ec.ECDH(), self.partial_key.public_key())
+        combined_shared = shared_key + shared_key_partial
+        
         # Derive encryption key using HKDF
         derived_key = HKDF(
             algorithm=hashes.SHA256(),
@@ -155,7 +158,7 @@ class CertificatelessCrypto:
             salt=None,
             info=self.system_params['kdf_info'],
             backend=default_backend()
-        ).derive(shared_key)
+        ).derive(combined_shared)
         
         # Generate random IV
         iv = os.urandom(16)
@@ -215,6 +218,9 @@ class CertificatelessCrypto:
             ec.ECDH(),
             ephemeral_public_key
         )
+        shared_key_partial = self.partial_key.exchange(ec.ECDH(), ephemeral_public_key)
+        combined_shared = shared_key + shared_key_partial
+
         
         # Derive decryption key using HKDF
         derived_key = HKDF(
@@ -223,7 +229,7 @@ class CertificatelessCrypto:
             salt=None,
             info=self.system_params['kdf_info'],
             backend=default_backend()
-        ).derive(shared_key)
+        ).derive(combined_shared)
         
         # Decrypt data
         decryptor = Cipher(
@@ -276,14 +282,36 @@ class CertificatelessCrypto:
                 public_key_pem,
                 backend=default_backend()
             )
+            # In CertificatelessCrypto
+    def initialize_with_partial_key(self, user_id: str, kgc):
+        """
+        Setup certificateless keys: combine KGC's partial private key and user's secret key.
+        """
+        self.user_id = user_id
+        self.partial_key = kgc.generate_partial_private_key(user_id)
+        self.user_secret = ec.generate_private_key(ec.SECP256R1(), default_backend())
+
+        # Final private key: just use user secret for ECDH (partial key adds external trust)
+        self.private_key = self.user_secret
+        self.public_key = self.user_secret.public_key()
+        self._save_keys()
+        self.last_rotation = time.time()
+
 
 # Helper functions for quick use
 def create_crypto_instance(key_dir='./keys', rotation_interval=30):
     """Create a new certificateless crypto instance"""
     return CertificatelessCrypto(key_dir, rotation_interval)
 
-def load_public_key_from_file(key_path):
+def get_public_key(key_path):
     """Load a public key from a file"""
     with open(key_path, 'rb') as f:
         public_key_pem = f.read()
         return public_key_pem
+
+def get_timestamp():
+    """Load a public key from a file"""
+    with open('keys/key_timestamp.txt', 'rb') as f:
+        key_timestamp = f.read()
+        return key_timestamp
+

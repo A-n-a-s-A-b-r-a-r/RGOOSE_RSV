@@ -13,6 +13,7 @@ from ied_utils import getIPv4Add
 from parse_sed import parse_sed
 
 from CLC import CertificatelessCrypto
+from KGC import KeyGenerationCenter
 # --- Data Structures ---
 
 @dataclass
@@ -436,6 +437,7 @@ def process_received_data(data, addr, stats):
 # --- Main Function ---
 
 def main():
+    kgc = KeyGenerationCenter()
     # Initialize certificateless cryptography with 30-second key rotation
     crypto = CertificatelessCrypto(key_dir='./keys', rotation_interval=30)
     print("Initialized certificateless cryptography with 30-second key rotation")   
@@ -477,6 +479,8 @@ def main():
     # Test encryption/decryption
     demo_data = encrypt_aes_gcm(bytes([123]))
     decrypt_aes_gcm(demo_data)
+    
+    crypto.initialize_with_partial_key(ied_name, kgc)
 
     try:
         # Join multicast group
@@ -515,6 +519,7 @@ def main():
             start_time = time.time() * 1000
             try:
                 decrypted_payload = crypto.decrypt_bytes(bytes(payload))
+                # decrypted_payload = decrypt_aes_gcm(bytes(payload))
                 decompressed_payload = decompress_data(bytes(decrypted_payload))
             except Exception as e:
                 print(f"Decryption error: {e}")

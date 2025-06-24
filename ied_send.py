@@ -9,7 +9,11 @@ from zz_diagnose import *
 from parse_sed import *
 import time
 import os
-from CLC import load_public_key_from_file, CertificatelessCrypto
+
+from CLC import get_public_key, get_timestamp, CertificatelessCrypto
+from compression_encryption import compress_data, encrypt_aes_gcm, decrypt_aes_gcm, key, generate_hmac_cryptography
+
+from KGC import KeyGenerationCenter
 
 
 HEADER_LENGTH = 18  # Length of the PDU header (example)
@@ -18,13 +22,8 @@ TAG_SIZE = 16  # Tag size for AES-GCM in bytes
 AES_KEY_SIZE = 32  # AES-256 key size in bytes
 
 IEDUDPPORT = 102
+
 from form_pdu import form_goose_pdu, form_sv_pdu
-from compression_encryption import compress_data, decompress_data, encrypt_aes_gcm, decrypt_aes_gcm;
-
-from compression_encryption import key
-from compression_encryption import generate_hmac_cryptography
-
-
 
 total_encrypt_time = 0
 total_packets = 0
@@ -96,8 +95,14 @@ def main(argv):
     while True:
         time.sleep(1)  # in seconds
         # Initialize crypto
+        kgc = KeyGenerationCenter()  # Simulated shared KGC
+        
+        receiver_identity = ied_name 
+        receiver_pubkey_pem = get_public_key('./keys/public_key.pem')
+        
         sender_crypto = CertificatelessCrypto(key_dir='./sender_keys', rotation_interval=30)
-        receiver_pubkey = load_public_key_from_file('./keys/public_key.pem')
+        sender_crypto.initialize_with_partial_key(ied_name, kgc)
+
 
         # Form network packet for each Control Block
         for i in range(len(ownControlBlocks)):
@@ -139,7 +144,6 @@ def main(argv):
             # PDU
             payload.extend(pdu_1)
             
-
             # Based on RFC-1240 protocol (OSI connectionless transport services on top of UDP)
             udp_data = []
             udp_data.append(0x01)  # Length Identifier (LI)
@@ -201,7 +205,8 @@ def main(argv):
             start_time = time.time()*1000
             payload = (compress_data(bytes(payload)))
             # payload = (encrypt_aes_gcm(bytes(payload)))
-            payload = sender_crypto.encrypt_bytes(payload, receiver_pubkey)
+
+            payload = sender_crypto.encrypt_bytes(payload, receiver_pubkey_pem)
 
             udp_data.extend(payload)
 
